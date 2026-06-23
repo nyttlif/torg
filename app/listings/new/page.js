@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '../../components/Navbar'
 import { supabase } from '@/lib/supabase'
-import { CATEGORIES, CONDITIONS, COLORS, LOCATIONS, SIZES_BY_TYPE, getCategoryPath } from '@/lib/categories'
+import { CATEGORIES, CONDITIONS, COLORS, LOCATIONS, getCategoryPath, getSizes } from '@/lib/categories'
 
 export default function NewListing() {
   const [user, setUser] = useState(null)
@@ -38,16 +38,10 @@ export default function NewListing() {
   const processFiles = async (files) => {
     const valid = Array.from(files).filter(f => f.type.startsWith('image/'))
     if (!valid.length) return
-    const newImages = valid.map(f => ({
-      id: Math.random().toString(36).slice(2),
-      preview: URL.createObjectURL(f),
-      url: null,
-      uploading: true
-    }))
+    const newImages = valid.map(f => ({ id: Math.random().toString(36).slice(2), preview: URL.createObjectURL(f), url: null, uploading: true }))
     setImages(prev => [...prev, ...newImages])
     for (let i = 0; i < valid.length; i++) {
-      const file = valid[i]
-      const id = newImages[i].id
+      const file = valid[i]; const id = newImages[i].id
       const ext = file.name.split('.').pop()
       const path = Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + ext
       const { error } = await supabase.storage.from('listings').upload(path, file, { contentType: file.type })
@@ -65,26 +59,18 @@ export default function NewListing() {
   const onDragStartImg = (i) => { dragItem.current = i }
   const onDragEnterImg = (i) => { dragTarget.current = i }
   const onDragEndImg = () => {
-    const from = dragItem.current
-    const to = dragTarget.current
+    const from = dragItem.current; const to = dragTarget.current
     if (from !== null && to !== null && from !== to) {
-      setImages(prev => {
-        const next = [...prev]
-        const moved = next.splice(from, 1)[0]
-        next.splice(to, 0, moved)
-        return next
-      })
+      setImages(prev => { const next = [...prev]; const moved = next.splice(from, 1)[0]; next.splice(to, 0, moved); return next })
     }
-    dragItem.current = null
-    dragTarget.current = null
+    dragItem.current = null; dragTarget.current = null
   }
 
   const catData = mainCat ? CATEGORIES[mainCat] : null
   const subKeys = catData ? Object.keys(catData.subcategories) : []
   const groupKeys = (subCat && catData) ? Object.keys(catData.subcategories[subCat] || {}) : []
   const leafKeys = (groupCat && subCat && catData) ? (catData.subcategories[subCat][groupCat] || []) : []
-  const sizes = subCat && SIZES_BY_TYPE[subCat] ? SIZES_BY_TYPE[subCat] : SIZES_BY_TYPE['default']
-  const showSize = mainCat === 'Föt og fatnaður' || mainCat === 'Skór og fylgihlutir'
+  const sizes = getSizes(mainCat, subCat, groupCat)
 
   const submit = async () => {
     setError('')
@@ -95,7 +81,6 @@ export default function NewListing() {
     if (images.length === 0) { setError('Að minnsta kosti ein mynd þarf að fylgja'); return }
     if (images.some(i => i.uploading)) { setError('Bíddu eftir að myndir hlaðist upp'); return }
     setLoading(true)
-    const categoryPath = getCategoryPath(mainCat, subCat, groupCat, leafCat)
     const { data, error } = await supabase.from('listings').insert({
       user_id: user.id,
       title: title.trim(),
@@ -103,12 +88,10 @@ export default function NewListing() {
       price: parseInt(price),
       category: mainCat,
       subcategory: subCat,
-      category_path: categoryPath,
-      condition,
-      location,
+      category_path: getCategoryPath(mainCat, subCat, groupCat, leafCat),
+      condition, location,
       brand: brand.trim(),
-      color,
-      size,
+      color, size,
       images: images.map(i => i.url).join(','),
       status: 'active'
     }).select().single()
@@ -127,16 +110,13 @@ export default function NewListing() {
         {/* Images */}
         <div style={{ marginBottom: '28px' }}>
           <label style={label}>Myndir</label>
-          <div
-            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-            style={{ border: '2px dashed ' + (dragOver ? '#111' : '#e0e0e0'), borderRadius: '12px', padding: '20px', background: dragOver ? '#f5f5f5' : '#fafafa', minHeight: '80px' }}
-          >
+          <div onDragOver={e => { e.preventDefault(); setDragOver(true) }} onDragLeave={() => setDragOver(false)} onDrop={onDrop}
+            style={{ border: '2px dashed ' + (dragOver ? '#111' : '#e0e0e0'), borderRadius: '12px', padding: '20px', background: dragOver ? '#f5f5f5' : '#fafafa', minHeight: '80px' }}>
             {images.length > 0 && (
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
                 {images.map((img, i) => (
-                  <div key={img.id} draggable onDragStart={() => onDragStartImg(i)} onDragEnter={() => onDragEnterImg(i)} onDragEnd={onDragEndImg} onDragOver={e => e.preventDefault()} style={{ position: 'relative', width: '96px', height: '128px', cursor: 'grab', flexShrink: 0 }}>
+                  <div key={img.id} draggable onDragStart={() => onDragStartImg(i)} onDragEnter={() => onDragEnterImg(i)} onDragEnd={onDragEndImg} onDragOver={e => e.preventDefault()}
+                    style={{ position: 'relative', width: '96px', height: '128px', cursor: 'grab', flexShrink: 0 }}>
                     <img src={img.preview} alt="" style={{ width: '96px', height: '128px', objectFit: 'cover', borderRadius: '8px', border: i === 0 ? '2px solid #111' : '1px solid #e5e5e5', opacity: img.uploading ? 0.5 : 1, display: 'block' }} />
                     {i === 0 && <div style={{ position: 'absolute', bottom: '5px', left: '5px', background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '10px', padding: '2px 5px', borderRadius: '3px' }}>Forsíða</div>}
                     {img.uploading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', background: 'rgba(255,255,255,0.4)' }}><div style={{ width: '18px', height: '18px', border: '2px solid #ddd', borderTop: '2px solid #111', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /></div>}
@@ -157,49 +137,68 @@ export default function NewListing() {
         {/* Category cascade */}
         <div style={{ marginBottom: '24px' }}>
           <label style={label}>Flokkur</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-            {/* Main category */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-              {Object.entries(CATEGORIES).map(([name, data]) => (
-                <button key={name} onClick={() => { setMainCat(name); setSubCat(''); setGroupCat(''); setLeafCat('') }}
-                  style={{ padding: '10px 8px', borderRadius: '8px', border: '1px solid ' + (mainCat === name ? '#111' : '#e5e5e5'), background: mainCat === name ? '#111' : '#fff', color: mainCat === name ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>{data.icon}</span> {name}
-                </button>
-              ))}
-            </div>
-
-            {/* Sub category */}
-            {subKeys.length > 0 && (
-              <select value={subCat} onChange={e => { setSubCat(e.target.value); setGroupCat(''); setLeafCat('') }} style={input}>
-                <option value="">Velja undirflokk...</option>
-                {subKeys.map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
-            )}
-
-            {/* Group */}
-            {groupKeys.length > 0 && (
-              <select value={groupCat} onChange={e => { setGroupCat(e.target.value); setLeafCat('') }} style={input}>
-                <option value="">Velja tegund...</option>
-                {groupKeys.map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
-            )}
-
-            {/* Leaf */}
-            {leafKeys.length > 0 && (
-              <select value={leafCat} onChange={e => setLeafCat(e.target.value)} style={input}>
-                <option value="">Velja nákvæman flokk...</option>
-                {leafKeys.map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
-            )}
-
-            {/* Path display */}
-            {mainCat && (
-              <div style={{ fontSize: '12px', color: '#888', padding: '6px 10px', background: '#f5f5f5', borderRadius: '6px' }}>
-                {getCategoryPath(mainCat, subCat, groupCat, leafCat)}
-              </div>
-            )}
+          {/* Main category grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', marginBottom: subKeys.length ? '10px' : '0' }}>
+            {Object.entries(CATEGORIES).map(([name, data]) => (
+              <button key={name} onClick={() => { setMainCat(name); setSubCat(''); setGroupCat(''); setLeafCat(''); setSize('') }}
+                style={{ padding: '10px 8px', borderRadius: '8px', border: '1px solid ' + (mainCat === name ? '#111' : '#e5e5e5'), background: mainCat === name ? '#111' : '#fff', color: mainCat === name ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {data.icon} {name}
+              </button>
+            ))}
           </div>
+
+          {/* Subcategory */}
+          {subKeys.length > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Undirflokkur</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {subKeys.map(k => (
+                  <button key={k} onClick={() => { setSubCat(k); setGroupCat(''); setLeafCat(''); setSize('') }}
+                    style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (subCat === k ? '#111' : '#e5e5e5'), background: subCat === k ? '#111' : '#fff', color: subCat === k ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer' }}>
+                    {k}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Group */}
+          {groupKeys.length > 0 && subCat && (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Tegund</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {groupKeys.map(k => (
+                  <button key={k} onClick={() => { setGroupCat(k); setLeafCat(''); setSize('') }}
+                    style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (groupCat === k ? '#111' : '#e5e5e5'), background: groupCat === k ? '#111' : '#fff', color: groupCat === k ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer' }}>
+                    {k}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Leaf */}
+          {leafKeys.length > 0 && groupCat && (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Nákvæmur flokkur</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {leafKeys.map(k => (
+                  <button key={k} onClick={() => setLeafCat(k)}
+                    style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (leafCat === k ? '#111' : '#e5e5e5'), background: leafCat === k ? '#111' : '#fff', color: leafCat === k ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer' }}>
+                    {k}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Path breadcrumb */}
+          {mainCat && (
+            <div style={{ fontSize: '12px', color: '#888', padding: '6px 10px', background: '#f5f5f5', borderRadius: '6px', marginTop: '6px' }}>
+              {getCategoryPath(mainCat, subCat, groupCat, leafCat)}
+            </div>
+          )}
         </div>
 
         {/* Title */}
@@ -234,24 +233,32 @@ export default function NewListing() {
           <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="t.d. Nike, Apple, IKEA..." style={input} />
         </div>
 
-        {/* Color + Size */}
-        <div style={{ display: 'grid', gridTemplateColumns: showSize ? '1fr 1fr' : '1fr', gap: '16px', marginBottom: '16px' }}>
-          <div>
-            <label style={label}>Litur <span style={{ color: '#999', fontWeight: '400' }}>(valfrjálst)</span></label>
-            <select value={color} onChange={e => setColor(e.target.value)} style={input}>
-              <option value="">Velja lit...</option>
-              {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          {showSize && (
-            <div>
-              <label style={label}>Stærð</label>
-              <select value={size} onChange={e => setSize(e.target.value)} style={input}>
-                <option value="">Velja stærð...</option>
-                {sizes.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+        {/* Size — only for clothes and shoes */}
+        {sizes && (
+          <div style={{ marginBottom: '16px' }}>
+            <label style={label}>Stærð</label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {sizes.map(s => (
+                <button key={s} onClick={() => setSize(size === s ? '' : s)}
+                  style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (size === s ? '#111' : '#e5e5e5'), background: size === s ? '#111' : '#fff', color: size === s ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer', minWidth: '44px', textAlign: 'center' }}>
+                  {s}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Color */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={label}>Litur <span style={{ color: '#999', fontWeight: '400' }}>(valfrjálst)</span></label>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {COLORS.map(c => (
+              <button key={c} onClick={() => setColor(color === c ? '' : c)}
+                style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (color === c ? '#111' : '#e5e5e5'), background: color === c ? '#111' : '#fff', color: color === c ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer' }}>
+                {c}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Price + Location */}
@@ -273,7 +280,8 @@ export default function NewListing() {
 
         {error && <div style={{ background: '#fef2f2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px', border: '1px solid #fecaca' }}>{error}</div>}
 
-        <button onClick={submit} disabled={loading || anyUploading} style={{ width: '100%', background: loading || anyUploading ? '#999' : '#111', color: '#fff', padding: '15px', borderRadius: '10px', border: 'none', fontSize: '16px', fontWeight: '600', cursor: loading || anyUploading ? 'not-allowed' : 'pointer' }}>
+        <button onClick={submit} disabled={loading || anyUploading}
+          style={{ width: '100%', background: loading || anyUploading ? '#999' : '#111', color: '#fff', padding: '15px', borderRadius: '10px', border: 'none', fontSize: '16px', fontWeight: '600', cursor: loading || anyUploading ? 'not-allowed' : 'pointer' }}>
           {loading ? 'Augnablik...' : anyUploading ? 'Hleð upp myndum...' : 'Birta auglýsingu'}
         </button>
       </div>

@@ -190,7 +190,7 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link href="/auth" style={{ fontSize: '14px', color: '#111', textDecoration: 'none', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontWeight: '500' }}>Innskrá</Link>
+              <Link href="/auth" style={{ fontSize: '14px', color: '#111', textDecoration: 'none', padding: '8px 16px', borderRadius: '8px', border: '1px solid #e5e5e5', fontWeight: '500' }}>Skrá inn</Link>
               <Link href="/auth" style={{ background: '#111', color: '#fff', padding: '8px 14px', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '500' }}>+ Selja</Link>
             </>
           )}
@@ -259,10 +259,10 @@ export default function Navbar() {
             ) : (
               <div style={{ padding: '16px' }}>
                 <Link href="/auth" onClick={() => setMenuOpen(false)} style={{ display: 'block', background: '#111', color: '#fff', padding: '14px', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '600', textAlign: 'center', marginBottom: '10px' }}>
-                  Innskrá / Nýskrá
+                  + Selja
                 </Link>
                 <Link href="/auth" onClick={() => setMenuOpen(false)} style={{ display: 'block', border: '1px solid #e5e5e5', color: '#111', padding: '14px', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '500', textAlign: 'center' }}>
-                  + Selja
+                  Skrá inn
                 </Link>
               </div>
             )}

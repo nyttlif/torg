@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { AuthModal } from '../auth/page'
 
 export default function Navbar() {
   const [user, setUser] = useState(null)
@@ -14,6 +15,7 @@ export default function Navbar() {
   const [unreadNotifs, setUnreadNotifs] = useState(0)
   const [notifOpen, setNotifOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
   const notifRef = useRef(null)
   const router = useRouter()
 
@@ -190,8 +192,8 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link href="/auth" style={{ fontSize: '14px', color: '#111', textDecoration: 'none', padding: '8px 16px', borderRadius: '8px', border: '1px solid #e5e5e5', fontWeight: '500' }}>Skrá inn</Link>
-              <Link href="/auth" style={{ background: '#111', color: '#fff', padding: '8px 14px', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '500' }}>+ Selja</Link>
+              <button onClick={() => setAuthOpen(true)} style={{ fontSize: '14px', color: '#111', padding: '8px 16px', borderRadius: '8px', border: '1px solid #e5e5e5', fontWeight: '500', background: '#fff', cursor: 'pointer' }}>Skrá inn</button>
+              <button onClick={() => setAuthOpen(true)} style={{ background: '#111', color: '#fff', padding: '8px 14px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>+ Selja</button>
             </>
           )}
         </div>
@@ -258,17 +260,19 @@ export default function Navbar() {
               </>
             ) : (
               <div style={{ padding: '16px' }}>
-                <Link href="/auth" onClick={() => setMenuOpen(false)} style={{ display: 'block', background: '#111', color: '#fff', padding: '14px', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '600', textAlign: 'center', marginBottom: '10px' }}>
+                <button onClick={() => { setMenuOpen(false); setAuthOpen(true) }} style={{ display: 'block', width: '100%', background: '#111', color: '#fff', padding: '14px', borderRadius: '10px', border: 'none', fontSize: '15px', fontWeight: '600', textAlign: 'center', marginBottom: '10px', cursor: 'pointer' }}>
                   + Selja
-                </Link>
-                <Link href="/auth" onClick={() => setMenuOpen(false)} style={{ display: 'block', border: '1px solid #e5e5e5', color: '#111', padding: '14px', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '500', textAlign: 'center' }}>
+                </button>
+                <button onClick={() => { setMenuOpen(false); setAuthOpen(true) }} style={{ display: 'block', width: '100%', border: '1px solid #e5e5e5', color: '#111', padding: '14px', borderRadius: '10px', background: '#fff', fontSize: '15px', fontWeight: '500', textAlign: 'center', cursor: 'pointer' }}>
                   Skrá inn
-                </Link>
+                </button>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} onSuccess={() => { setAuthOpen(false); router.refresh() }} />}
 
       <style>{`
         @media (max-width: 768px) {

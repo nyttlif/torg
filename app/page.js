@@ -89,42 +89,53 @@ function HomeContent() {
 
       {/* Desktop filter bar */}
       <div className="desktop-filters" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
-            <Pill active={!mainCat} onClick={() => { setMainCat(''); setSubCat(''); setGroupCat(''); setSize('') }}>Allt</Pill>
-            {Object.entries(CATEGORIES).map(([name, data]) => (
-              <Pill key={name} active={mainCat === name} onClick={() => { setMainCat(mainCat === name ? '' : name); setSubCat(''); setGroupCat(''); setSize('') }}>
-                {data.icon} {name}
-              </Pill>
-            ))}
-            {hasFilters && <Pill active={false} onClick={clearAll}>✕ Hreinsa síu</Pill>}
+        {/* Row 1: categories */}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Pill active={!mainCat} onClick={() => { setMainCat(''); setSubCat(''); setGroupCat(''); setSize('') }}>Allt</Pill>
+          {Object.entries(CATEGORIES).map(([name, data]) => (
+            <Pill key={name} active={mainCat === name} onClick={() => { setMainCat(mainCat === name ? '' : name); setSubCat(''); setGroupCat(''); setSize('') }}>
+              {data.icon} {name}
+            </Pill>
+          ))}
+          {hasFilters && <Pill active={false} onClick={clearAll}>✕ Hreinsa síu</Pill>}
+        </div>
+
+        {/* Row 2: utility controls right-aligned */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
+          {/* Sort */}
+          <div ref={sortRef} style={{ position: 'relative' }}>
+            <button onClick={() => { setSortOpen(o => !o); setLocationOpen(false) }}
+              style={{ padding: '6px 12px', fontSize: '13px', border: '1px solid #e5e5e5', borderRadius: '8px', background: sort !== 'Nýjast' ? '#111' : '#fff', color: sort !== 'Nýjast' ? '#fff' : '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {sort} <span style={{ opacity: 0.5, fontSize: '11px' }}>↕</span>
+            </button>
+            {sortOpen && (
+              <div style={{ position: 'absolute', top: '36px', right: 0, background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', zIndex: 50, overflow: 'hidden', minWidth: '140px' }}>
+                {SORT_OPTIONS.map(o => <button key={o} onClick={() => { setSort(o); setSortOpen(false) }} style={{ display: 'block', width: '100%', padding: '10px 16px', background: sort === o ? '#f5f5f5' : '#fff', border: 'none', textAlign: 'left', fontSize: '13px', cursor: 'pointer', fontWeight: sort === o ? '600' : '400' }}>{o}</button>)}
+              </div>
+            )}
           </div>
-          <div style={{ width: '1px', height: '28px', background: '#e5e5e5', flexShrink: 0 }} />
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
-            <div ref={sortRef} style={{ position: 'relative' }}>
-              <Pill active={sort !== 'Nýjast'} onClick={() => { setSortOpen(o => !o); setLocationOpen(false) }}>
-                {sort} <span style={{ opacity: 0.5, fontSize: '11px' }}>↕</span>
-              </Pill>
-              {sortOpen && (
-                <div style={{ position: 'absolute', top: '36px', right: 0, background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', zIndex: 50, overflow: 'hidden', minWidth: '140px' }}>
-                  {SORT_OPTIONS.map(o => <button key={o} onClick={() => { setSort(o); setSortOpen(false) }} style={{ display: 'block', width: '100%', padding: '10px 16px', background: sort === o ? '#f5f5f5' : '#fff', border: 'none', textAlign: 'left', fontSize: '13px', cursor: 'pointer', fontWeight: sort === o ? '600' : '400' }}>{o}</button>)}
-                </div>
-              )}
-            </div>
-            <div ref={locationRef} style={{ position: 'relative' }}>
-              <Pill active={!!location} onClick={() => { setLocationOpen(o => !o); setSortOpen(false) }}>
-                📍 {location || 'Staðsetning'}
-              </Pill>
-              {locationOpen && (
-                <div style={{ position: 'absolute', top: '36px', right: 0, background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', zIndex: 50, overflow: 'hidden', minWidth: '160px' }}>
-                  <button onClick={() => { setLocation(''); setLocationOpen(false) }} style={{ display: 'block', width: '100%', padding: '10px 16px', background: !location ? '#f5f5f5' : '#fff', border: 'none', textAlign: 'left', fontSize: '13px', cursor: 'pointer' }}>Allar staðsetningar</button>
-                  {LOCATIONS.map(l => <button key={l} onClick={() => { setLocation(l); setLocationOpen(false) }} style={{ display: 'block', width: '100%', padding: '10px 16px', background: location === l ? '#f5f5f5' : '#fff', border: 'none', textAlign: 'left', fontSize: '13px', cursor: 'pointer', fontWeight: location === l ? '600' : '400' }}>{l}</button>)}
-                </div>
-              )}
-            </div>
-            <input type="number" placeholder="Lágm." value={minPrice} onChange={e => setMinPrice(e.target.value)} style={{ width: '80px', padding: '6px 10px', fontSize: '13px', border: '1px solid ' + (minPrice ? '#111' : '#e5e5e5'), borderRadius: '20px', outline: 'none', background: minPrice ? '#111' : '#fff', color: minPrice ? '#fff' : '#111' }} />
+
+          {/* Location */}
+          <div ref={locationRef} style={{ position: 'relative' }}>
+            <button onClick={() => { setLocationOpen(o => !o); setSortOpen(false) }}
+              style={{ padding: '6px 12px', fontSize: '13px', border: '1px solid #e5e5e5', borderRadius: '8px', background: location ? '#111' : '#fff', color: location ? '#fff' : '#555', cursor: 'pointer' }}>
+              📍 {location || 'Staðsetning'}
+            </button>
+            {locationOpen && (
+              <div style={{ position: 'absolute', top: '36px', right: 0, background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', zIndex: 50, overflow: 'hidden', minWidth: '160px' }}>
+                <button onClick={() => { setLocation(''); setLocationOpen(false) }} style={{ display: 'block', width: '100%', padding: '10px 16px', background: !location ? '#f5f5f5' : '#fff', border: 'none', textAlign: 'left', fontSize: '13px', cursor: 'pointer' }}>Allar staðsetningar</button>
+                {LOCATIONS.map(l => <button key={l} onClick={() => { setLocation(l); setLocationOpen(false) }} style={{ display: 'block', width: '100%', padding: '10px 16px', background: location === l ? '#f5f5f5' : '#fff', border: 'none', textAlign: 'left', fontSize: '13px', cursor: 'pointer', fontWeight: location === l ? '600' : '400' }}>{l}</button>)}
+              </div>
+            )}
+          </div>
+
+          {/* Price */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <input type="number" placeholder="Lágm." value={minPrice} onChange={e => setMinPrice(e.target.value)}
+              style={{ width: '76px', padding: '6px 10px', fontSize: '13px', border: '1px solid #e5e5e5', borderRadius: '8px', outline: 'none', color: '#555', background: minPrice ? '#111' : '#fff', color: minPrice ? '#fff' : '#555' }} />
             <span style={{ fontSize: '13px', color: '#aaa' }}>–</span>
-            <input type="number" placeholder="Hám." value={maxPrice} onChange={e => setMaxPrice(e.target.value)} style={{ width: '80px', padding: '6px 10px', fontSize: '13px', border: '1px solid ' + (maxPrice ? '#111' : '#e5e5e5'), borderRadius: '20px', outline: 'none', background: maxPrice ? '#111' : '#fff', color: maxPrice ? '#fff' : '#111' }} />
+            <input type="number" placeholder="Hám." value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
+              style={{ width: '76px', padding: '6px 10px', fontSize: '13px', border: '1px solid #e5e5e5', borderRadius: '8px', outline: 'none', color: '#555', background: maxPrice ? '#111' : '#fff', color: maxPrice ? '#fff' : '#555' }} />
           </div>
         </div>
         {subKeys.length > 0 && (

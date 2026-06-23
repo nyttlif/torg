@@ -28,7 +28,7 @@ export default function MessageThread() {
   useEffect(() => {
     const channel = supabase.channel('messages-' + id)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'conversation_id=eq.' + id }, payload => {
-        setMessages(prev => [...prev, payload.new])
+        setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new])
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
@@ -41,7 +41,7 @@ export default function MessageThread() {
   const fetchConv = async (uid) => {
     const { data } = await supabase
       .from('conversations')
-      .select('*, listings(id, title, images, price, status), buyer:profiles!conversations_buyer_id_fkey(id, name), seller:profiles!conversations_seller_id_fkey(id, name)')
+      .select('*, listings(id, title, images, price, status), buyer:profiles!conversations_buyer_id_fkey(id, name, avatar_url), seller:profiles!conversations_seller_id_fkey(id, name, avatar_url)')
       .eq('id', id)
       .single()
     if (!data || (data.buyer_id !== uid && data.seller_id !== uid)) { router.push('/messages'); return }
@@ -60,8 +60,14 @@ export default function MessageThread() {
   const send = async () => {
     if (!text.trim() || sending) return
     setSending(true)
-    await supabase.from('messages').insert({ conversation_id: parseInt(id), sender_id: user.id, content: text.trim() })
+    const content = text.trim()
     setText('')
+    const { data } = await supabase
+      .from('messages')
+      .insert({ conversation_id: parseInt(id), sender_id: user.id, content })
+      .select('*, profiles(name)')
+      .single()
+    if (data) setMessages(prev => [...prev, data])
     setSending(false)
   }
 
@@ -71,31 +77,35 @@ export default function MessageThread() {
 
   const other = user?.id === conv.buyer_id ? conv.seller : conv.buyer
   const img = conv.listings?.images?.split(',')[0]
+  const avatarInitial = other?.name?.[0]?.toUpperCase() || '?'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', maxWidth: '100vw' }}>
       <Navbar />
-      <div style={{ maxWidth: '700px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, padding: '0 20px' }}>
+      <div style={{ maxWidth: '700px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, padding: '0 16px', minWidth: 0, overflow: 'hidden' }}>
 
         {/* Header */}
         <div style={{ padding: '16px 0', borderBottom: '1px solid #e5e5e5', display: 'flex', gap: '12px', alignItems: 'center' }}>
           <Link href="/messages" style={{ color: '#111', textDecoration: 'none', fontSize: '18px' }}>←</Link>
-          {img && <img src={img} style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px' }} />}
+          {img && <Link href={'/listings/' + conv.listings?.id} style={{ flexShrink: 0 }}><img src={img} style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', display: 'block' }} /></Link>}
           <div>
-            <div style={{ fontWeight: '500', fontSize: '14px' }}>{other?.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <div style={{ width: '18px', height: '18px', borderRadius: '50%', overflow: 'hidden', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '600', color: '#555', flexShrink: 0 }}>
+                {other?.avatar_url
+                  ? <img src={other.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : avatarInitial
+                }
+              </div>
+              <div style={{ fontWeight: '500', fontSize: '14px' }}>{other?.name}</div>
+            </div>
             <Link href={'/listings/' + conv.listings?.id} style={{ fontSize: '12px', color: '#888', textDecoration: 'none' }}>
               {conv.listings?.title} · {conv.listings?.price?.toLocaleString('is-IS')} kr.
             </Link>
           </div>
-          {conv.listings?.status === 'active' && user?.id === conv.buyer_id && (
-            <Link href={'/checkout/' + conv.listings?.id} style={{ marginLeft: 'auto', background: '#2563eb', color: '#fff', padding: '8px 14px', borderRadius: '8px', textDecoration: 'none', fontSize: '13px', fontWeight: '500', flexShrink: 0 }}>
-              Kaupa
-            </Link>
-          )}
         </div>
 
         {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {messages.map(m => {
             const mine = m.sender_id === user?.id
             return (
@@ -115,7 +125,7 @@ export default function MessageThread() {
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={onKey}
-            placeholder="Skrifaðu skilaboð... (Enter til að senda)"
+            placeholder="Skrifaðu skilaboð..."
             rows={1}
             style={{ flex: 1, padding: '10px 14px', border: '1px solid #e5e5e5', borderRadius: '24px', fontSize: '14px', outline: 'none', resize: 'none', lineHeight: '1.5' }}
           />

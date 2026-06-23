@@ -7,8 +7,8 @@ import Navbar from './components/Navbar'
 import { supabase } from '@/lib/supabase'
 import { CATEGORIES, LOCATIONS, getSizes } from '@/lib/categories'
 
-const SORT_OPTIONS = ['Nýjast', 'Lægst verð', 'Hæst verð']
-const SORT_MAP = { 'Nýjast': 'newest', 'Lægst verð': 'price_asc', 'Hæst verð': 'price_desc' }
+const SORT_OPTIONS = ['Nýjast', 'Lægsta verð', 'Hæsta verð']
+const SORT_MAP = { 'Nýjast': 'newest', 'Lægsta verð': 'price_asc', 'Hæsta verð': 'price_desc' }
 
 function Pill({ active, onClick, children }) {
   return (
@@ -53,7 +53,7 @@ function HomeContent() {
 
   const fetchListings = useCallback(async () => {
     setLoading(true)
-    let query = supabase.from('listings').select('*, profiles(name)').eq('status', 'active')
+    let query = supabase.from('listings').select('*, profiles(name, avatar_url)').eq('status', 'active')
     if (mainCat) query = query.eq('category', mainCat)
     if (subCat) query = query.eq('subcategory', subCat)
     if (size) query = query.eq('size', size)
@@ -77,7 +77,8 @@ function HomeContent() {
 
   const catData = mainCat ? CATEGORIES[mainCat] : null
   const subKeys = catData ? Object.keys(catData.subcategories) : []
-  const groupKeys = (subCat && catData) ? Object.keys(catData.subcategories[subCat] || {}) : []
+  const subValue = (subCat && catData) ? catData.subcategories[subCat] : null
+  const groupKeys = (subValue && !Array.isArray(subValue) && typeof subValue === 'object') ? Object.keys(subValue) : []
   const sizes = getSizes(mainCat, subCat, groupCat)
   const isFirstVisit = !loading && listings.length === 0 && !hasFilters && !search
 
@@ -96,7 +97,7 @@ function HomeContent() {
                 {data.icon} {name}
               </Pill>
             ))}
-            {hasFilters && <Pill active={false} onClick={clearAll}>✕ Hreinsa</Pill>}
+            {hasFilters && <Pill active={false} onClick={clearAll}>✕ Hreinsa síu</Pill>}
           </div>
           <div style={{ width: '1px', height: '28px', background: '#e5e5e5', flexShrink: 0 }} />
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
@@ -159,24 +160,18 @@ function HomeContent() {
       {/* Mobile filter drawer */}
       {filterDrawerOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
-          {/* Backdrop */}
           <div onClick={() => setFilterDrawerOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
-          {/* Sheet */}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: '#fff', borderRadius: '16px 16px 0 0', padding: '20px 20px 40px', maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ fontSize: '17px', fontWeight: '600' }}>Síur</h2>
               <button onClick={() => setFilterDrawerOpen(false)} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#666' }}>✕</button>
             </div>
-
-            {/* Sort */}
             <div style={{ marginBottom: '20px' }}>
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Röðun</div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {SORT_OPTIONS.map(o => <Pill key={o} active={sort === o} onClick={() => setSort(o)}>{o}</Pill>)}
               </div>
             </div>
-
-            {/* Category */}
             <div style={{ marginBottom: '20px' }}>
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Flokkur</div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -188,7 +183,6 @@ function HomeContent() {
                 ))}
               </div>
             </div>
-
             {subKeys.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Undirflokkur</div>
@@ -197,7 +191,6 @@ function HomeContent() {
                 </div>
               </div>
             )}
-
             {groupKeys.length > 0 && subCat && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tegund</div>
@@ -206,7 +199,6 @@ function HomeContent() {
                 </div>
               </div>
             )}
-
             {sizes && sizes.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Stærð</div>
@@ -215,8 +207,6 @@ function HomeContent() {
                 </div>
               </div>
             )}
-
-            {/* Location */}
             <div style={{ marginBottom: '20px' }}>
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Staðsetning</div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -224,8 +214,6 @@ function HomeContent() {
                 {LOCATIONS.map(l => <Pill key={l} active={location === l} onClick={() => setLocation(l)}>{l}</Pill>)}
               </div>
             </div>
-
-            {/* Price */}
             <div style={{ marginBottom: '28px' }}>
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verð</div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -234,11 +222,9 @@ function HomeContent() {
                 <input type="number" placeholder="Hámark kr." value={maxPrice} onChange={e => setMaxPrice(e.target.value)} style={{ flex: 1, padding: '10px 14px', fontSize: '14px', border: '1px solid #e5e5e5', borderRadius: '8px', outline: 'none' }} />
               </div>
             </div>
-
-            {/* Actions */}
             <div style={{ display: 'flex', gap: '10px' }}>
               {hasFilters && (
-                <button onClick={() => { clearAll(); }} style={{ flex: 1, padding: '13px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', fontSize: '15px', cursor: 'pointer', color: '#666' }}>Hreinsa allt</button>
+                <button onClick={() => { clearAll(); }} style={{ flex: 1, padding: '13px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', fontSize: '15px', cursor: 'pointer', color: '#666' }}>Hreinsa síu</button>
               )}
               <button onClick={() => setFilterDrawerOpen(false)} style={{ flex: 2, padding: '13px', background: '#111', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>
                 Sýna niðurstöður {listings.length > 0 && '(' + listings.length + ')'}
@@ -256,7 +242,15 @@ function HomeContent() {
 
       {loading ? (
         <div className="listing-grid">
-          {[...Array(8)].map((_, i) => <div key={i} style={{ background: '#eee', borderRadius: '10px', aspectRatio: '3/4', animation: 'pulse 1.5s ease-in-out infinite' }} />)}
+          {[...Array(8)].map((_, i) => (
+            <div key={i} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #e5e5e5' }}>
+              <div style={{ width: '100%', aspectRatio: '3 / 4', background: '#eee', animation: 'pulse 1.5s ease-in-out infinite' }} />
+              <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ height: '14px', background: '#eee', borderRadius: '4px', width: '70%', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div style={{ height: '16px', background: '#eee', borderRadius: '4px', width: '40%', animation: 'pulse 1.5s ease-in-out infinite' }} />
+              </div>
+            </div>
+          ))}
         </div>
       ) : isFirstVisit ? (
         <div style={{ textAlign: 'center', padding: '80px 20px' }}>
@@ -276,15 +270,24 @@ function HomeContent() {
       ) : (
         <div className="listing-grid">
           {listings.map(listing => (
-            <Link key={listing.id} href={'/listings/' + listing.id} style={{ textDecoration: 'none', color: 'inherit' }}>
-              <div style={{ background: '#fff', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e5e5e5' }}>
-                <div style={{ aspectRatio: '3/4', background: '#f0f0f0', overflow: 'hidden' }}>
-                  {listing.images ? <img src={listing.images.split(',')[0]} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>📦</div>}
-                </div>
-                <div style={{ padding: '10px 12px 12px' }}>
-                  <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.title}</div>
-                  <div style={{ fontWeight: '700', fontSize: '16px', marginBottom: '4px' }}>{listing.price.toLocaleString('is-IS')} kr.</div>
-                  <div style={{ fontSize: '12px', color: '#999' }}>{listing.profiles?.name}</div>
+            <Link key={listing.id} href={'/listings/' + listing.id} className="listing-card">
+              <div className="listing-img">
+                {listing.images
+                  ? <img src={listing.images.split(',')[0]} alt={listing.title} />
+                  : <span style={{ fontSize: '32px' }}>📦</span>
+                }
+              </div>
+              <div style={{ padding: '8px 10px 10px' }}>
+                <div style={{ fontWeight: '500', fontSize: '13px', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.title}</div>
+                <div style={{ fontWeight: '700', fontSize: '15px', marginBottom: '3px' }}>{listing.price.toLocaleString('is-IS')} kr.</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <div style={{ width: '16px', height: '16px', borderRadius: '50%', overflow: 'hidden', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontWeight: '600', color: '#555', flexShrink: 0 }}>
+                    {listing.profiles?.avatar_url
+                      ? <img src={listing.profiles.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : listing.profiles?.name?.[0]?.toUpperCase()
+                    }
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.profiles?.name}</div>
                 </div>
               </div>
             </Link>
@@ -298,7 +301,31 @@ function HomeContent() {
         @media (max-width: 768px) {
           .desktop-filters { display: none !important; }
           .mobile-filters { display: flex !important; }
-          .listing-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+          .listing-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
+        }
+        .listing-card {
+          text-decoration: none;
+          color: inherit;
+          display: block;
+          background: #fff;
+          border-radius: 10px;
+          overflow: hidden;
+          border: 1px solid #e5e5e5;
+        }
+        .listing-img {
+          width: 100%;
+          aspect-ratio: 3 / 4;
+          background: #f0f0f0;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .listing-img img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
         @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
       `}</style>

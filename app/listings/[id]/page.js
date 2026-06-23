@@ -5,18 +5,17 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '../../components/Navbar'
 import { supabase } from '@/lib/supabase'
+import { CONDITIONS } from '@/lib/categories'
 
-const SHIPPING = {
-  'Reykjavík': { dropp: 590, post: 890 },
-  'Kópavogur': { dropp: 590, post: 890 },
-  'Hafnarfjörður': { dropp: 590, post: 890 },
-  'Garðabær': { dropp: 590, post: 890 },
-  'Mosfellsbær': { dropp: 690, post: 990 },
-  'Akureyri': { dropp: 790, post: 1290 },
-  'Árborg': { dropp: 790, post: 1190 },
-  'Akranes': { dropp: 690, post: 990 },
-  'Vestmannaeyjar': { dropp: 890, post: 1490 },
-  'default': { dropp: 690, post: 1190 },
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now() - new Date(ts)) / 1000)
+  if (diff < 60) return 'Rétt í þessu'
+  if (diff < 3600) return Math.floor(diff / 60) + ' mín síðan'
+  if (diff < 86400) return Math.floor(diff / 3600) + ' klst síðan'
+  if (diff < 86400 * 7) return Math.floor(diff / 86400) + ' dögum síðan'
+  if (diff < 86400 * 30) return Math.floor(diff / 86400 / 7) + ' vikum síðan'
+  if (diff < 86400 * 365) return Math.floor(diff / 86400 / 30) + ' mánuðum síðan'
+  return Math.floor(diff / 86400 / 365) + ' árum síðan'
 }
 
 function Lightbox({ imgs, startIndex, onClose }) {
@@ -88,9 +87,6 @@ export default function ListingPage() {
   const [sellerListings, setSellerListings] = useState([])
   const [similarListings, setSimilarListings] = useState([])
   const [bookmarked, setBookmarked] = useState(false)
-  const [offerOpen, setOfferOpen] = useState(false)
-  const [offer, setOffer] = useState('')
-  const [offerSent, setOfferSent] = useState(false)
   const [copied, setCopied] = useState(false)
   const [reported, setReported] = useState(false)
   const [contacting, setContacting] = useState(false)
@@ -159,15 +155,6 @@ export default function ListingPage() {
     router.push('/messages/' + convId)
   }
 
-  const sendOffer = async () => {
-    if (!user) { router.push('/auth'); return }
-    if (!offer || parseInt(offer) <= 0) return
-    const convId = await getOrCreateConv()
-    await supabase.from('messages').insert({ conversation_id: convId, sender_id: user.id, content: 'Tilboð: ' + parseInt(offer).toLocaleString('is-IS') + ' kr.' })
-    setOfferSent(true); setOfferOpen(false)
-    router.push('/messages/' + convId)
-  }
-
   const markStatus = async (status) => {
     await supabase.from('listings').update({ status }).eq('id', id)
     fetchListing()
@@ -178,15 +165,19 @@ export default function ListingPage() {
 
   const imgs = listing.images ? listing.images.split(',').filter(Boolean) : []
   const isOwner = user?.id === listing.user_id
-  const shipping = SHIPPING[listing.location] || SHIPPING['default']
+  const conditionLabel = CONDITIONS.find(c => c.value === listing.condition)?.label || listing.condition
   const specs = [
-    listing.condition && { label: 'Ástand', value: listing.condition },
+    listing.condition && { label: 'Ástand', value: conditionLabel },
     listing.brand && { label: 'Vörumerki', value: listing.brand },
     listing.size && { label: 'Stærð', value: listing.size },
     listing.color && { label: 'Litur', value: listing.color },
     listing.location && { label: 'Staðsetning', value: listing.location },
   ].filter(Boolean)
 
+  // Thumbnails fill the same height as main image (3:4 ratio)
+  // Main image width = 340px, so height = 340 * 4/3 = ~453px
+  // 4 thumbs with 3 gaps of 6px: thumb height = (453 - 18) / 4 = ~108.75px
+  // Thumb width at 3:4 = 108.75 * 3/4 = ~81px
   const THUMB_COUNT = 4
 
   return (
@@ -208,7 +199,8 @@ export default function ListingPage() {
               {/* Main image */}
               <div
                 onClick={() => openLightbox(activeImg)}
-                style={{ width: '340px', flexShrink: 0, aspectRatio: '3/4', borderRadius: '10px', overflow: 'hidden', position: 'relative', cursor: 'zoom-in' }}
+                className="main-img"
+                style={{ borderRadius: '10px', overflow: 'hidden', position: 'relative', cursor: 'zoom-in' }}
               >
                 {imgs[activeImg] ? (
                   <img src={imgs[activeImg]} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -224,24 +216,46 @@ export default function ListingPage() {
 
               {/* Thumbnails */}
               {imgs.length > 1 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '68px', flexShrink: 0 }}>
-                  {imgs.slice(0, THUMB_COUNT).map((url, i) => (
-                    <div
-                      key={i}
-                      onClick={() => i === THUMB_COUNT - 1 && imgs.length > THUMB_COUNT ? openLightbox(i) : setActiveImg(i)}
-                      style={{ aspectRatio: '3/4', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', position: 'relative', border: activeImg === i && !(i === THUMB_COUNT - 1 && imgs.length > THUMB_COUNT) ? '2px solid #111' : '2px solid transparent' }}
-                    >
-                      <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: activeImg === i ? 1 : 0.7 }} />
-                      {i === THUMB_COUNT - 1 && imgs.length > THUMB_COUNT && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', fontWeight: '700' }}>
-                          +{imgs.length - THUMB_COUNT}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '72px', flexShrink: 0 }}>
+                  {imgs.slice(1, THUMB_COUNT + 1).map((url, i) => {
+                    const realIndex = i + 1
+                    const isLast = realIndex === THUMB_COUNT && imgs.length > THUMB_COUNT + 1
+                    return (
+                      <div
+                        key={realIndex}
+                        onClick={() => isLast ? openLightbox(realIndex) : setActiveImg(realIndex)}
+                        style={{ aspectRatio: '3/4', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', position: 'relative', border: activeImg === realIndex && !isLast ? '2px solid #111' : '2px solid transparent' }}
+                      >
+                        <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: activeImg === realIndex ? 1 : 0.7 }} />
+                        {isLast && (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', fontWeight: '700' }}>
+                            +{imgs.length - THUMB_COUNT - 1}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
+
+            {/* Related listings — desktop only, under images */}
+            {sellerListings.length > 0 && (
+              <div className="related-desktop" style={{ marginTop: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                  <h2 style={{ fontSize: '14px', fontWeight: '600' }}>Fleiri vörur frá {listing.profiles?.name}</h2>
+                  <Link href={'/profile/' + listing.profiles?.id} style={{ fontSize: '12px', color: '#666', textDecoration: 'none' }}>Sjá allt →</Link>
+                </div>
+                <div className="mini-grid">{sellerListings.map(l => <MiniCard key={l.id} listing={l} />)}</div>
+              </div>
+            )}
+
+            {similarListings.length > 0 && (
+              <div className="related-desktop" style={{ marginTop: '24px' }}>
+                <h2 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Aðrar svipaðar vörur</h2>
+                <div className="mini-grid">{similarListings.map(l => <MiniCard key={l.id} listing={l} />)}</div>
+              </div>
+            )}
           </div>
 
           {/* Right panel */}
@@ -249,27 +263,22 @@ export default function ListingPage() {
             <h1 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '6px', lineHeight: '1.3' }}>{listing.title}</h1>
             <div style={{ fontSize: '26px', fontWeight: '700', marginBottom: '16px' }}>{listing.price.toLocaleString('is-IS')} kr.</div>
 
+            {listing.description && <p style={{ fontSize: '14px', lineHeight: '1.7', color: '#444', marginBottom: '14px' }}>{listing.description}</p>}
+
             {specs.length > 0 && (
               <div style={{ border: '1px solid #e5e5e5', borderRadius: '10px', padding: '4px 16px', marginBottom: '14px' }}>
                 {specs.map(({ label, value }, i) => (
-                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: i < specs.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid #f5f5f5' }}>
                     <span style={{ fontSize: '13px', color: '#888' }}>{label}</span>
                     <span style={{ fontSize: '13px', fontWeight: '500' }}>{value}</span>
                   </div>
                 ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0' }}>
+                  <span style={{ fontSize: '13px', color: '#888' }}>Birt</span>
+                  <span style={{ fontSize: '13px', fontWeight: '500' }}>{timeAgo(listing.created_at)}</span>
+                </div>
               </div>
             )}
-
-            {listing.description && <p style={{ fontSize: '14px', lineHeight: '1.7', color: '#444', marginBottom: '14px' }}>{listing.description}</p>}
-
-            <div style={{ background: '#f9f9f9', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
-              <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px', fontWeight: '500' }}>Áætlaður sendingarkostnaður</div>
-              <div style={{ display: 'flex', gap: '20px' }}>
-                <div><div style={{ fontSize: '11px', color: '#aaa', marginBottom: '2px' }}>Dropp hirðilás</div><div style={{ fontSize: '14px', fontWeight: '600' }}>~{shipping.dropp.toLocaleString('is-IS')} kr.</div></div>
-                <div style={{ width: '1px', background: '#e5e5e5' }} />
-                <div><div style={{ fontSize: '11px', color: '#aaa', marginBottom: '2px' }}>Póstur</div><div style={{ fontSize: '14px', fontWeight: '600' }}>~{shipping.post.toLocaleString('is-IS')} kr.</div></div>
-              </div>
-            </div>
 
             <Link href={'/profile/' + listing.profiles?.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: '#f9f9f9', borderRadius: '10px', textDecoration: 'none', color: 'inherit', marginBottom: '14px' }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600', fontSize: '14px', flexShrink: 0, overflow: 'hidden' }}>
@@ -292,31 +301,9 @@ export default function ListingPage() {
                 {listing.status === 'reserved' && <button onClick={() => markStatus('active')} style={{ padding: '9px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', color: '#666', cursor: 'pointer' }}>Taka af frátekingu</button>}
               </div>
             ) : listing.status === 'active' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button onClick={contactSeller} disabled={contacting} style={{ width: '100%', background: '#fff', color: '#111', padding: '12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
-                  {contacting ? 'Augnablik...' : 'Hafa samband'}
-                </button>
-                {offerSent ? (
-                  <div style={{ background: '#f0fdf4', color: '#16a34a', padding: '11px', borderRadius: '8px', fontSize: '14px', textAlign: 'center' }}>Tilboð sent!</div>
-                ) : offerOpen ? (
-                  <div style={{ border: '1px solid #e5e5e5', borderRadius: '8px', padding: '12px' }}>
-                    <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>Upphaflegt verð: {listing.price.toLocaleString('is-IS')} kr.</div>
-                    <div style={{ position: 'relative', marginBottom: '8px' }}>
-                      <input type="number" value={offer} onChange={e => setOffer(e.target.value)} placeholder="Tilboðsverð..." autoFocus style={{ width: '100%', padding: '10px 44px 10px 12px', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '14px', outline: 'none' }} />
-                      <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#999', fontSize: '13px' }}>kr.</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => setOfferOpen(false)} style={{ flex: 1, padding: '10px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#666' }}>Hætta við</button>
-                      <button onClick={sendOffer} style={{ flex: 1, padding: '10px', background: '#111', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Senda</button>
-                    </div>
-                  </div>
-                ) : (
-                  <button onClick={() => setOfferOpen(true)} style={{ width: '100%', padding: '12px', background: '#fff', color: '#111', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>Senda tilboð</button>
-                )}
-                <button onClick={() => router.push('/checkout/' + id)} style={{ width: '100%', background: '#111', color: '#fff', padding: '14px', borderRadius: '8px', border: 'none', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>
-                  Kaupa núna — {listing.price.toLocaleString('is-IS')} kr.
-                </button>
-              </div>
+              <button onClick={contactSeller} disabled={contacting} style={{ width: '100%', background: '#111', color: '#fff', padding: '13px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
+                {contacting ? 'Augnablik...' : 'Hafa samband'}
+              </button>
             ) : (
               <div style={{ background: '#f5f5f5', padding: '14px', borderRadius: '8px', fontSize: '14px', color: '#666', textAlign: 'center' }}>
                 {listing.status === 'reserved' ? 'Þessi vara er frátekið' : 'Þessi vara hefur verið seld'}
@@ -346,20 +333,19 @@ export default function ListingPage() {
           </div>
         </div>
 
-        {/* More from seller — tight to content */}
+        {/* Related listings — mobile only, after info panel */}
         {sellerListings.length > 0 && (
-          <div style={{ marginTop: '32px', marginBottom: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: '600' }}>Fleiri vörur frá {listing.profiles?.name}</h2>
-              <Link href={'/profile/' + listing.profiles?.id} style={{ fontSize: '13px', color: '#666', textDecoration: 'none' }}>Sjá allt →</Link>
+          <div className="related-mobile" style={{ marginTop: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <h2 style={{ fontSize: '14px', fontWeight: '600' }}>Fleiri vörur frá {listing.profiles?.name}</h2>
+              <Link href={'/profile/' + listing.profiles?.id} style={{ fontSize: '12px', color: '#666', textDecoration: 'none' }}>Sjá allt →</Link>
             </div>
             <div className="mini-grid">{sellerListings.map(l => <MiniCard key={l.id} listing={l} />)}</div>
           </div>
         )}
-
         {similarListings.length > 0 && (
-          <div style={{ marginBottom: '40px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Aðrar svipaðar vörur</h2>
+          <div className="related-mobile" style={{ marginTop: '24px' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Aðrar svipaðar vörur</h2>
             <div className="mini-grid">{similarListings.map(l => <MiniCard key={l.id} listing={l} />)}</div>
           </div>
         )}
@@ -373,14 +359,17 @@ export default function ListingPage() {
           align-items: start;
           justify-content: center;
         }
-        .listing-info { position: sticky; top: 72px; }
-        .mini-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+        .main-img { width: 380px; flex-shrink: 0; aspect-ratio: 3/4; max-height: 520px; }
+        .listing-info { position: static; }
+        .mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .related-mobile { display: none; }
         @media (max-width: 768px) {
-          .listing-layout { grid-template-columns: 1fr; gap: 24px; justify-content: stretch; }
-          .listing-info { position: static; }
-          .mini-grid { grid-template-columns: repeat(3, 1fr); }
+          .listing-layout { grid-template-columns: 1fr; gap: 16px; justify-content: stretch; }
+          .main-img { width: 100%; flex-shrink: 1; aspect-ratio: 3/4; max-height: none; }
+          .mini-grid { grid-template-columns: repeat(2, 1fr); }
+          .related-desktop { display: none !important; }
+          .related-mobile { display: block; }
         }
-        @media (max-width: 480px) { .mini-grid { grid-template-columns: repeat(2, 1fr); } }
       `}</style>
     </div>
   )

@@ -21,12 +21,30 @@ export default function InboxPage() {
   }, [])
 
   const fetchConversations = async (uid) => {
-    const { data } = await supabase
+    const { data: convs, error } = await supabase
       .from('conversations')
-      .select('*, listings(id, title, images, price), buyer:profiles!conversations_buyer_id_fkey(id, name), seller:profiles!conversations_seller_id_fkey(id, name)')
+      .select('*, listings(id, title, images, price)')
       .or('buyer_id.eq.' + uid + ',seller_id.eq.' + uid)
       .order('created_at', { ascending: false })
-    setConversations(data || [])
+
+    if (error || !convs) { setLoading(false); return }
+
+    // Collect all unique profile IDs needed
+    const profileIds = [...new Set(convs.flatMap(c => [c.buyer_id, c.seller_id]).filter(Boolean))]
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, name, avatar_url')
+      .in('id', profileIds)
+
+    const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]))
+
+    const enriched = convs.map(c => ({
+      ...c,
+      buyer: profileMap[c.buyer_id] || null,
+      seller: profileMap[c.seller_id] || null,
+    }))
+
+    setConversations(enriched)
     setLoading(false)
   }
 
@@ -45,13 +63,28 @@ export default function InboxPage() {
               const isbuyer = user?.id === conv.buyer_id
               const other = isbuyer ? conv.seller : conv.buyer
               const img = conv.listings?.images?.split(',')[0]
+              const avatarInitial = other?.name?.[0]?.toUpperCase() || '?'
+
               return (
                 <Link key={conv.id} href={'/messages/' + conv.id} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div style={{ display: 'flex', gap: '14px', padding: '16px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', alignItems: 'center' }}>
-                    {img ? <img src={img} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} /> : <div style={{ width: '56px', height: '56px', background: '#f0f0f0', borderRadius: '6px', flexShrink: 0 }} />}
+
+                    {img
+                      ? <img src={img} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />
+                      : <div style={{ width: '56px', height: '56px', background: '#f0f0f0', borderRadius: '6px', flexShrink: 0 }} />
+                    }
+
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.listings?.title}</div>
-                      <div style={{ fontSize: '12px', color: '#888' }}>{other?.name} · {conv.listings?.price?.toLocaleString('is-IS')} kr.</div>
+                      <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.listings?.title}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '18px', height: '18px', borderRadius: '50%', overflow: 'hidden', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '600', color: '#555', flexShrink: 0 }}>
+                          {other?.avatar_url
+                            ? <img src={other.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : avatarInitial
+                          }
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#888' }}>{other?.name} · {conv.listings?.price?.toLocaleString('is-IS')} kr.</span>
+                      </div>
                     </div>
                     <div style={{ fontSize: '12px', color: '#aaa' }}>→</div>
                   </div>

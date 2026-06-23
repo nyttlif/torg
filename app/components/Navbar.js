@@ -43,6 +43,9 @@ export default function Navbar() {
     return () => { supabase.removeChannel(ch); supabase.removeChannel(ch2) }
   }, [user])
 
+  // Close menu on route change
+  useEffect(() => { setMenuOpen(false) }, [router])
+
   const fetchProfile = async (uid) => { const { data } = await supabase.from('profiles').select('name, avatar_url').eq('id', uid).single(); setProfile(data) }
 
   const fetchUnreadMessages = async (uid) => {
@@ -106,7 +109,24 @@ export default function Navbar() {
   const MailIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
   const BellIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
 
+  const HamburgerIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  )
+
+  const CloseIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+
   const Badge = ({ count }) => count > 0 ? <span style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#ef4444', color: '#fff', borderRadius: '10px', padding: '1px 5px', fontSize: '10px', fontWeight: '700', minWidth: '16px', textAlign: 'center', lineHeight: '14px' }}>{count > 9 ? '9+' : count}</span> : null
+
+  const totalMobileUnread = unreadMessages + unreadNotifs
 
   return (
     <>
@@ -116,13 +136,15 @@ export default function Navbar() {
           Torget
         </Link>
 
-        <form onSubmit={handleSearch} style={{ flex: 1, display: 'flex' }}>
+        <form onSubmit={handleSearch} style={{ width: '340px', flexShrink: 1, minWidth: 0, display: 'flex' }}>
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Leita að vöru..."
             style={{ flex: 1, padding: '8px 14px', fontSize: '14px', border: '1px solid #e5e5e5', borderRight: 'none', borderRadius: '8px 0 0 8px', background: '#f5f5f5', outline: 'none', color: '#111', minWidth: 0 }} />
           <button type="submit" style={{ padding: '0 12px', background: '#111', color: '#fff', border: 'none', borderRadius: '0 8px 8px 0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
           </button>
         </form>
+
+        <div style={{ flex: 1 }} />
 
         {/* Desktop nav */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }} className="desktop-nav">
@@ -174,54 +196,85 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile icon row */}
-        <div style={{ display: 'none', gap: '6px', alignItems: 'center', flexShrink: 0 }} className="mobile-icons">
-          {user ? (
-            <>
-              <Link href="/bookmarks" style={iconBtn}><HeartIcon /></Link>
-              <Link href="/messages" style={iconBtn}><MailIcon /><Badge count={unreadMessages} /></Link>
-              <div ref={notifRef} style={{ position: 'relative' }}>
-                <button onClick={toggleNotif} style={{ ...iconBtn, border: '1px solid #e5e5e5' }}>
-                  <BellIcon /><Badge count={unreadNotifs} />
-                </button>
-                {notifOpen && (
-                  <div style={{ position: 'fixed', top: '56px', left: '8px', right: '8px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 200, overflow: 'hidden' }}>
-                    <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', fontWeight: '600', fontSize: '14px' }}>Tilkynningar</div>
-                    {notifications.length === 0 ? (
-                      <div style={{ padding: '24px', textAlign: 'center', color: '#aaa', fontSize: '14px' }}>Engar tilkynningar</div>
-                    ) : (
-                      <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                        {notifications.map(n => (
-                          <Link key={n.id} href={notifLink(n)} onClick={() => setNotifOpen(false)}
-                            style={{ display: 'flex', gap: '10px', padding: '12px 16px', textDecoration: 'none', color: 'inherit', background: n.read ? '#fff' : '#fafafa', borderBottom: '1px solid #f5f5f5', alignItems: 'flex-start' }}>
-                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600', fontSize: '12px', flexShrink: 0 }}>
-                              {n.from_profile?.name?.[0]?.toUpperCase() || '?'}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '13px', lineHeight: '1.5' }}>{notifLabel(n)}</div>
-                              <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>{timeAgo(n.created_at)}</div>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              <Link href={'/profile/' + user.id} style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', border: '2px solid #e5e5e5', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e0e0e0', flexShrink: 0 }}>
-                {profile?.avatar_url ? <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{avatarInitial}</span>}
-              </Link>
-            </>
-          ) : (
-            <Link href="/auth" style={{ background: '#111', color: '#fff', padding: '8px 12px', borderRadius: '8px', textDecoration: 'none', fontSize: '13px', fontWeight: '500' }}>Innskrá</Link>
+        {/* Mobile: hamburger button */}
+        <button
+          className="mobile-hamburger"
+          onClick={() => setMenuOpen(o => !o)}
+          style={{ display: 'none', width: '36px', height: '36px', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e5e5', borderRadius: '8px', background: '#fff', cursor: 'pointer', color: '#111', flexShrink: 0, position: 'relative' }}
+        >
+          {menuOpen ? <CloseIcon /> : <HamburgerIcon />}
+          {!menuOpen && totalMobileUnread > 0 && (
+            <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#ef4444', color: '#fff', borderRadius: '10px', padding: '1px 4px', fontSize: '9px', fontWeight: '700', minWidth: '14px', textAlign: 'center', lineHeight: '13px' }}>
+              {totalMobileUnread > 9 ? '9+' : totalMobileUnread}
+            </span>
           )}
-        </div>
+        </button>
       </nav>
+
+      {/* Mobile slide-down menu */}
+      {menuOpen && (
+        <div className="mobile-menu" style={{ display: 'none', position: 'fixed', top: '56px', left: 0, right: 0, bottom: 0, zIndex: 99, flexDirection: 'column' }}>
+          {/* Backdrop */}
+          <div onClick={() => setMenuOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
+          {/* Panel */}
+          <div style={{ position: 'relative', background: '#fff', borderBottom: '1px solid #e5e5e5', padding: '8px 0 16px' }}>
+            {user ? (
+              <>
+                {/* User info */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 20px 16px', borderBottom: '1px solid #f0f0f0', marginBottom: '8px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', border: '2px solid #e5e5e5', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e0e0e0', flexShrink: 0 }}>
+                    {profile?.avatar_url ? <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '16px', fontWeight: '600', color: '#555' }}>{avatarInitial}</span>}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '15px', color: '#111' }}>{profile?.name || 'Notandi'}</div>
+                    <Link href={'/profile/' + user.id} onClick={() => setMenuOpen(false)} style={{ fontSize: '13px', color: '#888', textDecoration: 'none' }}>Skoða prófíl</Link>
+                  </div>
+                </div>
+
+                {/* Nav items */}
+                <Link href="/listings/new" onClick={() => setMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 20px', textDecoration: 'none', color: '#fff', background: '#111', margin: '4px 16px 8px', borderRadius: '10px', fontSize: '15px', fontWeight: '600' }}>
+                  <span style={{ flex: 1 }}>+ Selja</span>
+                </Link>
+                <Link href="/bookmarks" onClick={() => setMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 20px', textDecoration: 'none', color: '#111', fontSize: '15px' }}>
+                  <span style={{ color: '#555', display: 'flex' }}><HeartIcon /></span>
+                  <span style={{ flex: 1 }}>Vistað</span>
+                </Link>
+                <Link href="/messages" onClick={() => setMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 20px', textDecoration: 'none', color: '#111', fontSize: '15px' }}>
+                  <span style={{ color: '#555', display: 'flex' }}><MailIcon /></span>
+                  <span style={{ flex: 1 }}>Skilaboð</span>
+                  {unreadMessages > 0 && <span style={{ background: '#ef4444', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700' }}>{unreadMessages > 9 ? '9+' : unreadMessages}</span>}
+                </Link>
+                <button onClick={() => { setMenuOpen(false); toggleNotif() }} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 20px', width: '100%', background: 'none', border: 'none', color: '#111', fontSize: '15px', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ color: '#555', display: 'flex' }}><BellIcon /></span>
+                  <span style={{ flex: 1 }}>Tilkynningar</span>
+                  {unreadNotifs > 0 && <span style={{ background: '#ef4444', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700' }}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</span>}
+                </button>
+
+                <div style={{ margin: '8px 16px 0', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
+                  <button onClick={signOut} style={{ width: '100%', padding: '13px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: '15px', color: '#999', cursor: 'pointer' }}>
+                    Útskrá
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: '16px' }}>
+                <Link href="/auth" onClick={() => setMenuOpen(false)} style={{ display: 'block', background: '#111', color: '#fff', padding: '14px', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '600', textAlign: 'center', marginBottom: '10px' }}>
+                  Innskrá / Nýskrá
+                </Link>
+                <Link href="/auth" onClick={() => setMenuOpen(false)} style={{ display: 'block', border: '1px solid #e5e5e5', color: '#111', padding: '14px', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '500', textAlign: 'center' }}>
+                  + Selja
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <style>{`
         @media (max-width: 768px) {
           .desktop-nav { display: none !important; }
-          .mobile-icons { display: flex !important; }
+          .mobile-hamburger { display: flex !important; }
+          .mobile-menu { display: flex !important; }
         }
       `}</style>
     </>

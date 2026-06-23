@@ -4,7 +4,26 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Navbar from '../../../components/Navbar'
 import { supabase } from '@/lib/supabase'
-import { CATEGORIES, CONDITIONS, COLORS, LOCATIONS, SIZES_BY_TYPE, getCategoryPath } from '@/lib/categories'
+import { CATEGORIES, CONDITIONS, COLORS, LOCATIONS, getSizes, getCategoryPath } from '@/lib/categories'
+
+let idCounter = 0
+const uniqueId = () => 'img_' + (++idCounter) + '_' + Date.now()
+
+const toSRGB = (file) => new Promise(resolve => {
+  const img = new Image()
+  img.onload = () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, 0, 0)
+    canvas.toBlob(blob => {
+      URL.revokeObjectURL(img.src)
+      resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+    }, 'image/jpeg', 0.92)
+  }
+  img.src = URL.createObjectURL(file)
+})
 
 export default function EditListing() {
   const { id } = useParams()
@@ -24,9 +43,10 @@ export default function EditListing() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const dragItem = useRef(null)
   const dragTarget = useRef(null)
+  const isDragging = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -49,41 +69,49 @@ export default function EditListing() {
     setLocation(data.location || LOCATIONS[0])
     setMainCat(data.category || '')
     setSubCat(data.subcategory || '')
-    setImages(data.images ? data.images.split(',').filter(Boolean).map(url => ({ id: Math.random().toString(36).slice(2), url, preview: url, uploading: false })) : [])
+    setImages(data.images ? data.images.split(',').filter(Boolean).map(url => ({ id: uniqueId(), url, preview: url, uploading: false })) : [])
     setLoading(false)
   }
 
   const processFiles = async (files) => {
-    const valid = Array.from(files).filter(f => f.type.startsWith('image/'))
-    if (!valid.length) return
-    setUploading(true)
-    const newImages = valid.map(f => ({ id: Math.random().toString(36).slice(2), preview: URL.createObjectURL(f), url: null, uploading: true }))
+    const raw = Array.from(files).filter(f => f.type.startsWith('image/'))
+    if (!raw.length) return
+    const valid = await Promise.all(raw.map(toSRGB))
+    const newImages = valid.map(f => ({ id: uniqueId(), preview: URL.createObjectURL(f), url: null, uploading: true }))
     setImages(prev => [...prev, ...newImages])
     for (let i = 0; i < valid.length; i++) {
       const file = valid[i]
-      const id2 = newImages[i].id
+      const imgId = newImages[i].id
       const ext = file.name.split('.').pop()
       const path = Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + ext
       const { error } = await supabase.storage.from('listings').upload(path, file, { contentType: file.type })
       if (!error) {
         const { data } = supabase.storage.from('listings').getPublicUrl(path)
-        setImages(prev => prev.map(img => img.id === id2 ? { ...img, url: data.publicUrl, uploading: false } : img))
+        setImages(prev => prev.map(img => img.id === imgId ? { ...img, url: data.publicUrl, uploading: false } : img))
       } else {
-        setImages(prev => prev.filter(img => img.id !== id2))
+        setImages(prev => prev.filter(img => img.id !== imgId))
       }
     }
-    setUploading(false)
   }
 
   const removeImage = (imgId) => setImages(prev => prev.filter(img => img.id !== imgId))
-  const onDragStartImg = (i) => { dragItem.current = i }
+
+  const onDragStartImg = (i) => { dragItem.current = i; isDragging.current = true }
   const onDragEnterImg = (i) => { dragTarget.current = i }
   const onDragEndImg = () => {
-    const from = dragItem.current; const to = dragTarget.current
+    const from = dragItem.current
+    const to = dragTarget.current
     if (from !== null && to !== null && from !== to) {
-      setImages(prev => { const next = [...prev]; const moved = next.splice(from, 1)[0]; next.splice(to, 0, moved); return next })
+      setImages(prev => {
+        const next = [...prev]
+        const [moved] = next.splice(from, 1)
+        next.splice(to, 0, moved)
+        return next
+      })
     }
-    dragItem.current = null; dragTarget.current = null
+    dragItem.current = null
+    dragTarget.current = null
+    isDragging.current = false
   }
 
   const save = async () => {
@@ -113,7 +141,7 @@ export default function EditListing() {
   const catData = mainCat ? CATEGORIES[mainCat] : null
   const subKeys = catData ? Object.keys(catData.subcategories) : []
   const showSize = mainCat === 'Föt og fatnaður' || mainCat === 'Skór og fylgihlutir'
-  const sizes = subCat && SIZES_BY_TYPE[subCat] ? SIZES_BY_TYPE[subCat] : SIZES_BY_TYPE['default']
+  const sizes = getSizes(mainCat, subCat, '')
   const anyUploading = images.some(i => i.uploading)
 
   if (loading) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Hleður...</div></>
@@ -132,11 +160,21 @@ export default function EditListing() {
         {/* Images */}
         <div style={{ marginBottom: '28px' }}>
           <label style={labelStyle}>Myndir</label>
-          <div style={{ border: '2px dashed #e0e0e0', borderRadius: '12px', padding: '20px', background: '#fafafa', minHeight: '80px' }}>
+          <div
+            onDragOver={e => { e.preventDefault(); if (!isDragging.current) setDragOver(true) }}
+            onDragLeave={() => { if (!isDragging.current) setDragOver(false) }}
+            onDrop={e => { e.preventDefault(); if (!isDragging.current) { setDragOver(false); processFiles(e.dataTransfer.files) } }}
+            style={{ border: '2px dashed ' + (dragOver ? '#111' : '#e0e0e0'), borderRadius: '12px', padding: '20px', background: dragOver ? '#f5f5f5' : '#fafafa', minHeight: '80px' }}
+          >
             {images.length > 0 && (
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
                 {images.map((img, i) => (
-                  <div key={img.id} draggable onDragStart={() => onDragStartImg(i)} onDragEnter={() => onDragEnterImg(i)} onDragEnd={onDragEndImg} onDragOver={e => e.preventDefault()} style={{ position: 'relative', width: '96px', height: '128px', cursor: 'grab', flexShrink: 0 }}>
+                  <div key={img.id} draggable
+                    onDragStart={() => onDragStartImg(i)}
+                    onDragEnter={() => onDragEnterImg(i)}
+                    onDragEnd={onDragEndImg}
+                    onDragOver={e => e.preventDefault()}
+                    style={{ position: 'relative', width: '96px', height: '128px', cursor: 'grab', flexShrink: 0 }}>
                     <img src={img.preview} alt="" style={{ width: '96px', height: '128px', objectFit: 'cover', borderRadius: '8px', border: i === 0 ? '2px solid #111' : '1px solid #e5e5e5', opacity: img.uploading ? 0.5 : 1, display: 'block' }} />
                     {i === 0 && <div style={{ position: 'absolute', bottom: '5px', left: '5px', background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '10px', padding: '2px 5px', borderRadius: '3px' }}>Forsíða</div>}
                     <button onClick={() => removeImage(img.id)} style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#111', color: '#fff', border: 'none', borderRadius: '50%', width: '22px', height: '22px', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>✕</button>
@@ -150,6 +188,7 @@ export default function EditListing() {
               <input type="file" accept="image/*" multiple onChange={e => processFiles(e.target.files)} style={{ display: 'none' }} />
             </label>
           </div>
+          {images.length > 1 && <p style={{ fontSize: '11px', color: '#aaa', marginTop: '6px' }}>Dragðu til að breyta röð · Fyrsta mynd verður forsíða</p>}
         </div>
 
         {/* Category */}
@@ -164,10 +203,17 @@ export default function EditListing() {
             ))}
           </div>
           {subKeys.length > 0 && (
-            <select value={subCat} onChange={e => setSubCat(e.target.value)} style={inputStyle}>
-              <option value="">Velja undirflokk...</option>
-              {subKeys.map(k => <option key={k} value={k}>{k}</option>)}
-            </select>
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Undirflokkur</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {subKeys.map(k => (
+                  <button key={k} onClick={() => { setSubCat(k) }}
+                    style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (subCat === k ? '#111' : '#e5e5e5'), background: subCat === k ? '#111' : '#fff', color: subCat === k ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer' }}>
+                    {k}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
@@ -199,38 +245,48 @@ export default function EditListing() {
           <input value={brand} onChange={e => setBrand(e.target.value)} style={inputStyle} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: showSize ? '1fr 1fr' : '1fr', gap: '16px', marginBottom: '16px' }}>
-          <div>
-            <label style={labelStyle}>Litur</label>
-            <select value={color} onChange={e => setColor(e.target.value)} style={inputStyle}>
-              <option value="">Velja lit...</option>
-              {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={labelStyle}>Litur</label>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {COLORS.map(c => (
+              <button key={c} onClick={() => setColor(color === c ? '' : c)}
+                style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (color === c ? '#111' : '#e5e5e5'), background: color === c ? '#111' : '#fff', color: color === c ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer' }}>
+                {c}
+              </button>
+            ))}
           </div>
-          {showSize && (
-            <div>
-              <label style={labelStyle}>Stærð</label>
-              <select value={size} onChange={e => setSize(e.target.value)} style={inputStyle}>
-                <option value="">Velja stærð...</option>
-                {sizes.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-          )}
         </div>
+
+        {showSize && sizes && (
+          <div style={{ marginBottom: '16px' }}>
+            <label style={labelStyle}>Stærð</label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {sizes.map(s => (
+                <button key={s} onClick={() => setSize(size === s ? '' : s)}
+                  style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (size === s ? '#111' : '#e5e5e5'), background: size === s ? '#111' : '#fff', color: size === s ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer', minWidth: '44px', textAlign: 'center' }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
           <div>
             <label style={labelStyle}>Verð</label>
             <div style={{ position: 'relative' }}>
-              <input type="number" value={price} onChange={e => setPrice(e.target.value)} min="0" style={{ ...inputStyle, paddingRight: '44px' }} />
+              <input type="number" value={price} onChange={e => setPrice(e.target.value)} onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()} min="0" style={{ ...inputStyle, paddingRight: '44px' }} />
               <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#999', fontSize: '13px', pointerEvents: 'none' }}>kr.</span>
             </div>
           </div>
           <div>
             <label style={labelStyle}>Staðsetning</label>
-            <select value={location} onChange={e => setLocation(e.target.value)} style={inputStyle}>
-              {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
+            <div style={{ position: 'relative' }}>
+              <select value={location} onChange={e => setLocation(e.target.value)} style={{ ...inputStyle, appearance: 'none', paddingRight: '32px' }}>
+                {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#999', fontSize: '11px', pointerEvents: 'none' }}>▾</span>
+            </div>
           </div>
         </div>
 

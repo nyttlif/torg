@@ -6,6 +6,17 @@ import Link from 'next/link'
 import Navbar from '../../components/Navbar'
 import { supabase } from '@/lib/supabase'
 
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now() - new Date(ts)) / 1000)
+  if (diff < 60) return 'Rétt í þessu'
+  if (diff < 3600) return Math.floor(diff / 60) + ' mín síðan'
+  if (diff < 86400) return Math.floor(diff / 3600) + ' klst síðan'
+  if (diff < 86400 * 7) return Math.floor(diff / 86400) + ' dögum síðan'
+  if (diff < 86400 * 30) return Math.floor(diff / 86400 / 7) + ' vikum síðan'
+  if (diff < 86400 * 365) return Math.floor(diff / 86400 / 30) + ' mánuðum síðan'
+  return Math.floor(diff / 86400 / 365) + ' árum síðan'
+}
+
 export default function ProfilePage() {
   const { id } = useParams()
   const [profile, setProfile] = useState(null)
@@ -43,6 +54,8 @@ export default function ProfilePage() {
   if (loading) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Hleður...</div></>
   if (!profile) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Notandi fannst ekki</div></>
 
+  const hasRating = profile.rating_count > 0
+
   return (
     <div>
       <Navbar />
@@ -51,18 +64,31 @@ export default function ProfilePage() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '32px' }}>
           <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#e0e0e0', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '30px', flexShrink: 0 }}>
-            {profile.avatar_url ? (
-              <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              profile.name?.[0]?.toUpperCase()
-            )}
+            {profile.avatar_url
+              ? <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : profile.name?.[0]?.toUpperCase()
+            }
           </div>
           <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '4px' }}>{profile.name}</h1>
-            <div style={{ fontSize: '13px', color: '#888', marginBottom: '4px' }}>
-              {profile.rating_count > 0 ? '★ ' + profile.rating.toFixed(1) + ' · ' + profile.rating_count + ' umsagnir · ' : ''}
-              {activeListings.length} virkar auglýsingar
+            <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '6px' }}>{profile.name}</h1>
+
+            {/* Rating */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              {hasRating ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f5f5f5', borderRadius: '20px', padding: '3px 10px' }}>
+                    <span style={{ fontSize: '13px' }}>★</span>
+                    <span style={{ fontSize: '13px', fontWeight: '600' }}>{profile.rating.toFixed(1)}</span>
+                  </div>
+                  <span style={{ fontSize: '13px', color: '#888' }}>{profile.rating_count} umsagnir</span>
+                  <span style={{ fontSize: '13px', color: '#ccc' }}>·</span>
+                </>
+              ) : (
+                <span style={{ fontSize: '13px', color: '#aaa' }}>Engar umsagnir ·</span>
+              )}
+              <span style={{ fontSize: '13px', color: '#888' }}>{activeListings.length} virkar auglýsingar</span>
             </div>
+
             {profile.bio && <p style={{ fontSize: '14px', color: '#555', marginTop: '4px' }}>{profile.bio}</p>}
           </div>
           {isOwn && (
@@ -102,11 +128,15 @@ export default function ProfilePage() {
               <Link key={l.id} href={'/listings/' + l.id} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div style={{ background: '#fff', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e5e5e5' }}>
                   <div style={{ aspectRatio: '3/4', background: '#f0f0f0' }}>
-                    {l.images ? <img src={l.images.split(',')[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>📦</div>}
+                    {l.images
+                      ? <img src={l.images.split(',')[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>📦</div>
+                    }
                   </div>
                   <div style={{ padding: '10px' }}>
                     <div style={{ fontWeight: '500', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.title}</div>
                     <div style={{ fontWeight: '700', fontSize: '15px', marginTop: '2px' }}>{l.price.toLocaleString('is-IS')} kr.</div>
+                    <div style={{ fontSize: '11px', color: '#bbb', marginTop: '3px' }}>{timeAgo(l.created_at)}</div>
                   </div>
                 </div>
               </Link>

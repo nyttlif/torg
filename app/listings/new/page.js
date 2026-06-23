@@ -6,6 +6,25 @@ import Navbar from '../../components/Navbar'
 import { supabase } from '@/lib/supabase'
 import { CATEGORIES, CONDITIONS, COLORS, LOCATIONS, getCategoryPath, getSizes } from '@/lib/categories'
 
+let idCounter = 0
+const uniqueId = () => 'img_' + (++idCounter) + '_' + Date.now()
+
+const toSRGB = (file) => new Promise(resolve => {
+  const img = new Image()
+  img.onload = () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, 0, 0)
+    canvas.toBlob(blob => {
+      URL.revokeObjectURL(img.src)
+      resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+    }, 'image/jpeg', 0.92)
+  }
+  img.src = URL.createObjectURL(file)
+})
+
 export default function NewListing() {
   const [user, setUser] = useState(null)
   const [title, setTitle] = useState('')
@@ -26,6 +45,7 @@ export default function NewListing() {
   const [dragOver, setDragOver] = useState(false)
   const dragItem = useRef(null)
   const dragTarget = useRef(null)
+  const isDragging = useRef(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -36,12 +56,14 @@ export default function NewListing() {
   }, [])
 
   const processFiles = async (files) => {
-    const valid = Array.from(files).filter(f => f.type.startsWith('image/'))
-    if (!valid.length) return
-    const newImages = valid.map(f => ({ id: Math.random().toString(36).slice(2), preview: URL.createObjectURL(f), url: null, uploading: true }))
+    const raw = Array.from(files).filter(f => f.type.startsWith('image/'))
+    if (!raw.length) return
+    const valid = await Promise.all(raw.map(toSRGB))
+    const newImages = valid.map(f => ({ id: uniqueId(), preview: URL.createObjectURL(f), url: null, uploading: true }))
     setImages(prev => [...prev, ...newImages])
     for (let i = 0; i < valid.length; i++) {
-      const file = valid[i]; const id = newImages[i].id
+      const file = valid[i]
+      const id = newImages[i].id
       const ext = file.name.split('.').pop()
       const path = Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + ext
       const { error } = await supabase.storage.from('listings').upload(path, file, { contentType: file.type })
@@ -56,25 +78,44 @@ export default function NewListing() {
 
   const onDrop = (e) => { e.preventDefault(); setDragOver(false); processFiles(e.dataTransfer.files) }
   const removeImage = (id) => setImages(prev => prev.filter(img => img.id !== id))
-  const onDragStartImg = (i) => { dragItem.current = i }
-  const onDragEnterImg = (i) => { dragTarget.current = i }
+
+  const onDragStartImg = (i) => {
+    dragItem.current = i
+    isDragging.current = true
+  }
+
+  const onDragEnterImg = (i) => {
+    dragTarget.current = i
+  }
+
   const onDragEndImg = () => {
-    const from = dragItem.current; const to = dragTarget.current
+    const from = dragItem.current
+    const to = dragTarget.current
     if (from !== null && to !== null && from !== to) {
-      setImages(prev => { const next = [...prev]; const moved = next.splice(from, 1)[0]; next.splice(to, 0, moved); return next })
+      setImages(prev => {
+        const next = [...prev]
+        const [moved] = next.splice(from, 1)
+        next.splice(to, 0, moved)
+        return next
+      })
     }
-    dragItem.current = null; dragTarget.current = null
+    dragItem.current = null
+    dragTarget.current = null
+    isDragging.current = false
   }
 
   const catData = mainCat ? CATEGORIES[mainCat] : null
   const subKeys = catData ? Object.keys(catData.subcategories) : []
-  const groupKeys = (subCat && catData) ? Object.keys(catData.subcategories[subCat] || {}) : []
-  const leafKeys = (groupCat && subCat && catData) ? (catData.subcategories[subCat][groupCat] || []) : []
+  const subValue = (subCat && catData) ? catData.subcategories[subCat] : null
+  const groupKeys = (subValue && !Array.isArray(subValue) && typeof subValue === 'object') ? Object.keys(subValue) : []
+  const groupValue = (groupCat && subValue && !Array.isArray(subValue)) ? subValue[groupCat] : null
+  const leafKeys = Array.isArray(groupValue) ? groupValue : []
   const sizes = getSizes(mainCat, subCat, groupCat)
 
   const submit = async () => {
     setError('')
     if (!title.trim()) { setError('Titill vantar'); return }
+    if (!description.trim()) { setError('Lýsing vantar'); return }
     if (!price) { setError('Verð vantar'); return }
     if (!mainCat) { setError('Veldu flokk'); return }
     if (!condition) { setError('Veldu ástand'); return }
@@ -110,16 +151,31 @@ export default function NewListing() {
         {/* Images */}
         <div style={{ marginBottom: '28px' }}>
           <label style={label}>Myndir</label>
-          <div onDragOver={e => { e.preventDefault(); setDragOver(true) }} onDragLeave={() => setDragOver(false)} onDrop={onDrop}
-            style={{ border: '2px dashed ' + (dragOver ? '#111' : '#e0e0e0'), borderRadius: '12px', padding: '20px', background: dragOver ? '#f5f5f5' : '#fafafa', minHeight: '80px' }}>
+          <div
+            onDragOver={e => { e.preventDefault(); if (!isDragging.current) setDragOver(true) }}
+            onDragLeave={() => { if (!isDragging.current) setDragOver(false) }}
+            onDrop={e => { if (!isDragging.current) onDrop(e) }}
+            style={{ border: '2px dashed ' + (dragOver ? '#111' : '#e0e0e0'), borderRadius: '12px', padding: '20px', background: dragOver ? '#f5f5f5' : '#fafafa', minHeight: '80px' }}
+          >
             {images.length > 0 && (
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
                 {images.map((img, i) => (
-                  <div key={img.id} draggable onDragStart={() => onDragStartImg(i)} onDragEnter={() => onDragEnterImg(i)} onDragEnd={onDragEndImg} onDragOver={e => e.preventDefault()}
-                    style={{ position: 'relative', width: '96px', height: '128px', cursor: 'grab', flexShrink: 0 }}>
+                  <div
+                    key={img.id}
+                    draggable
+                    onDragStart={() => onDragStartImg(i)}
+                    onDragEnter={() => onDragEnterImg(i)}
+                    onDragEnd={onDragEndImg}
+                    onDragOver={e => e.preventDefault()}
+                    style={{ position: 'relative', width: '96px', height: '128px', cursor: 'grab', flexShrink: 0 }}
+                  >
                     <img src={img.preview} alt="" style={{ width: '96px', height: '128px', objectFit: 'cover', borderRadius: '8px', border: i === 0 ? '2px solid #111' : '1px solid #e5e5e5', opacity: img.uploading ? 0.5 : 1, display: 'block' }} />
                     {i === 0 && <div style={{ position: 'absolute', bottom: '5px', left: '5px', background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '10px', padding: '2px 5px', borderRadius: '3px' }}>Forsíða</div>}
-                    {img.uploading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', background: 'rgba(255,255,255,0.4)' }}><div style={{ width: '18px', height: '18px', border: '2px solid #ddd', borderTop: '2px solid #111', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /></div>}
+                    {img.uploading && (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', background: 'rgba(255,255,255,0.4)' }}>
+                        <div style={{ width: '18px', height: '18px', border: '2px solid #ddd', borderTop: '2px solid #111', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      </div>
+                    )}
                     <button onClick={() => removeImage(img.id)} style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#111', color: '#fff', border: 'none', borderRadius: '50%', width: '22px', height: '22px', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>✕</button>
                   </div>
                 ))}
@@ -127,7 +183,7 @@ export default function NewListing() {
             )}
             <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: images.length > 0 ? '4px 0 0' : '16px 0' }}>
               <div style={{ fontSize: '24px' }}>+</div>
-              <div style={{ fontSize: '13px', color: '#555', fontWeight: '500' }}>Smelltu til að velja eða dragðu myndir hingað</div>
+              <div style={{ fontSize: '13px', color: '#555', fontWeight: '500' }}>Bæta við myndum</div>
               <input type="file" accept="image/*" multiple onChange={e => processFiles(e.target.files)} style={{ display: 'none' }} />
             </label>
           </div>
@@ -137,8 +193,6 @@ export default function NewListing() {
         {/* Category cascade */}
         <div style={{ marginBottom: '24px' }}>
           <label style={label}>Flokkur</label>
-
-          {/* Main category grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', marginBottom: subKeys.length ? '10px' : '0' }}>
             {Object.entries(CATEGORIES).map(([name, data]) => (
               <button key={name} onClick={() => { setMainCat(name); setSubCat(''); setGroupCat(''); setLeafCat(''); setSize('') }}
@@ -147,8 +201,6 @@ export default function NewListing() {
               </button>
             ))}
           </div>
-
-          {/* Subcategory */}
           {subKeys.length > 0 && (
             <div style={{ marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Undirflokkur</div>
@@ -162,8 +214,6 @@ export default function NewListing() {
               </div>
             </div>
           )}
-
-          {/* Group */}
           {groupKeys.length > 0 && subCat && (
             <div style={{ marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Tegund</div>
@@ -177,23 +227,6 @@ export default function NewListing() {
               </div>
             </div>
           )}
-
-          {/* Leaf */}
-          {leafKeys.length > 0 && groupCat && (
-            <div style={{ marginBottom: '10px' }}>
-              <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Nákvæmur flokkur</div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {leafKeys.map(k => (
-                  <button key={k} onClick={() => setLeafCat(k)}
-                    style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (leafCat === k ? '#111' : '#e5e5e5'), background: leafCat === k ? '#111' : '#fff', color: leafCat === k ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer' }}>
-                    {k}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Path breadcrumb */}
           {mainCat && (
             <div style={{ fontSize: '12px', color: '#888', padding: '6px 10px', background: '#f5f5f5', borderRadius: '6px', marginTop: '6px' }}>
               {getCategoryPath(mainCat, subCat, groupCat, leafCat)}
@@ -210,7 +243,7 @@ export default function NewListing() {
 
         {/* Description */}
         <div style={{ marginBottom: '16px' }}>
-          <label style={label}>Lýsing <span style={{ color: '#999', fontWeight: '400' }}>(valfrjálst)</span></label>
+          <label style={label}>Lýsing</label>
           <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Lýstu vörunni nánar..." rows={4} style={{ ...input, resize: 'vertical', lineHeight: '1.6' }} />
         </div>
 
@@ -233,7 +266,7 @@ export default function NewListing() {
           <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="t.d. Nike, Apple, IKEA..." style={input} />
         </div>
 
-        {/* Size — only for clothes and shoes */}
+        {/* Size */}
         {sizes && (
           <div style={{ marginBottom: '16px' }}>
             <label style={label}>Stærð</label>
@@ -250,7 +283,7 @@ export default function NewListing() {
 
         {/* Color */}
         <div style={{ marginBottom: '16px' }}>
-          <label style={label}>Litur <span style={{ color: '#999', fontWeight: '400' }}>(valfrjálst)</span></label>
+          <label style={label}>Litur</label>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {COLORS.map(c => (
               <button key={c} onClick={() => setColor(color === c ? '' : c)}
@@ -266,15 +299,18 @@ export default function NewListing() {
           <div>
             <label style={label}>Verð</label>
             <div style={{ position: 'relative' }}>
-              <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" min="0" style={{ ...input, paddingRight: '44px' }} />
+              <input type="number" value={price} onChange={e => setPrice(e.target.value)} onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()} placeholder="0" min="0" style={{ ...input, paddingRight: '44px' }} />
               <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#999', fontSize: '13px', pointerEvents: 'none' }}>kr.</span>
             </div>
           </div>
           <div>
             <label style={label}>Staðsetning</label>
-            <select value={location} onChange={e => setLocation(e.target.value)} style={input}>
-              {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
+            <div style={{ position: 'relative' }}>
+              <select value={location} onChange={e => setLocation(e.target.value)} style={{ ...input, appearance: 'none', paddingRight: '32px' }}>
+                {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#999', fontSize: '11px', pointerEvents: 'none' }}>▾</span>
+            </div>
           </div>
         </div>
 

@@ -226,7 +226,7 @@ export default function ListingPage() {
                         onClick={() => openLightbox(realIndex)}
                         style={{ aspectRatio: '3/4', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', position: 'relative', border: '2px solid transparent' }}
                       >
-                        <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: activeImg === realIndex ? 1 : 0.7 }} />
+                        <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.8 }} />
                         {isLast && (
                           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', fontWeight: '700' }}>
                             +{imgs.length - THUMB_COUNT - 1}
@@ -238,24 +238,6 @@ export default function ListingPage() {
                 </div>
               )}
             </div>
-
-            {/* Related listings — desktop only, under images */}
-            {sellerListings.length > 0 && (
-              <div className="related-desktop" style={{ marginTop: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                  <h2 style={{ fontSize: '14px', fontWeight: '600' }}>Fleiri vörur frá {listing.profiles?.name}</h2>
-                  <Link href={'/profile/' + listing.profiles?.id} style={{ fontSize: '12px', color: '#666', textDecoration: 'none' }}>Sjá allt →</Link>
-                </div>
-                <div className="mini-grid">{sellerListings.map(l => <MiniCard key={l.id} listing={l} />)}</div>
-              </div>
-            )}
-
-            {similarListings.length > 0 && (
-              <div className="related-desktop" style={{ marginTop: '24px' }}>
-                <h2 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Aðrar svipaðar vörur</h2>
-                <div className="mini-grid">{similarListings.map(l => <MiniCard key={l.id} listing={l} />)}</div>
-              </div>
-            )}
           </div>
 
           {/* Right panel */}
@@ -333,9 +315,9 @@ export default function ListingPage() {
           </div>
         </div>
 
-        {/* Related listings — mobile only, after info panel */}
+        {/* Related listings — full width below both columns */}
         {sellerListings.length > 0 && (
-          <div className="related-mobile" style={{ marginTop: '24px' }}>
+          <div style={{ marginTop: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
               <h2 style={{ fontSize: '14px', fontWeight: '600' }}>Fleiri vörur frá {listing.profiles?.name}</h2>
               <Link href={'/profile/' + listing.profiles?.id} style={{ fontSize: '12px', color: '#666', textDecoration: 'none' }}>Sjá allt →</Link>
@@ -344,7 +326,7 @@ export default function ListingPage() {
           </div>
         )}
         {similarListings.length > 0 && (
-          <div className="related-mobile" style={{ marginTop: '24px' }}>
+          <div style={{ marginTop: '24px', marginBottom: '40px' }}>
             <h2 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Aðrar svipaðar vörur</h2>
             <div className="mini-grid">{similarListings.map(l => <MiniCard key={l.id} listing={l} />)}</div>
           </div>
@@ -361,10 +343,29 @@ export default function ListingPage() {
         }
         .main-img { width: 380px; flex-shrink: 0; aspect-ratio: 3/4; max-height: 520px; }
         .listing-info { position: static; }
-        .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .related-desktop { }
+        .mini-grid {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 8px;
+        }
         .mini-card { background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e5e5; }
-        .mini-card-img { width: 100%; padding-bottom: 133.33%; position: relative; background: #f0f0f0; overflow: hidden; }
-        .mini-card-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mini-card-img {
+          width: 100%;
+          padding-bottom: 133.33%;
+          position: relative;
+          background: #f0f0f0;
+          overflow: hidden;
+          display: block;
+        }
+        .mini-card-img img {
+          position: absolute;
+          top: 0; left: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
         .related-mobile { display: none; }
         @media (max-width: 768px) {
           .listing-layout { grid-template-columns: 1fr; gap: 16px; justify-content: stretch; }

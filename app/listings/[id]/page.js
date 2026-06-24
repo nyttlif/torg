@@ -361,9 +361,9 @@ export default function ListingPage() {
         }
         .main-img { width: 380px; flex-shrink: 0; aspect-ratio: 3/4; max-height: 520px; }
         .listing-info { position: static; }
-        .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; grid-auto-rows: 1fr; align-items: start; }
-        .mini-card-img { width: 100%; aspect-ratio: 3/4; background: #f0f0f0; overflow: hidden; }
-        .mini-card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .mini-card-img { width: 100%; position: relative; padding-bottom: 133.33%; background: #f0f0f0; overflow: hidden; }
+        .mini-card-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
         .related-mobile { display: none; }
         @media (max-width: 768px) {
           .listing-layout { grid-template-columns: 1fr; gap: 16px; justify-content: stretch; }

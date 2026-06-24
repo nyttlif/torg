@@ -1,11 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function Footer() {
   const [visible, setVisible] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+
+  useEffect(() => {
+    const seen = localStorage.getItem('torget_seen_about')
+    if (!seen) {
+      setShowAbout(true)
+      localStorage.setItem('torget_seen_about', '1')
+    }
+  }, [])
 
   const linkStyle = {
     fontSize: '13px',

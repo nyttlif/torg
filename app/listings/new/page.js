@@ -115,6 +115,8 @@ export default function NewListing() {
     if (!price) { setError('Verð vantar'); return }
     if (!mainCat) { setError('Veldu flokk'); return }
     if (!condition) { setError('Veldu ástand'); return }
+    if (sizes && sizes.length > 0 && !size) { setError('Veldu stærð'); return }
+    if (!color) { setError('Veldu lit'); return }
     if (images.length === 0) { setError('Að minnsta kosti ein mynd þarf að fylgja'); return }
     if (images.some(i => i.uploading)) { setError('Bíddu eftir að myndir hlaðist upp'); return }
     setLoading(true)
@@ -263,8 +265,8 @@ export default function NewListing() {
           <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="t.d. Nike, Apple, IKEA..." style={input} />
         </div>
 
-        {/* Size */}
-        {sizes && (
+        {/* Size — required when available */}
+        {sizes && sizes.length > 0 && (
           <div style={{ marginBottom: '16px' }}>
             <label style={label}>Stærð</label>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -278,7 +280,7 @@ export default function NewListing() {
           </div>
         )}
 
-        {/* Color */}
+        {/* Color — always required */}
         <div style={{ marginBottom: '16px' }}>
           <label style={label}>Litur</label>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>

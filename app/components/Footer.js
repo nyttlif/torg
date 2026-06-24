@@ -121,9 +121,14 @@ export default function Footer() {
               Um Torget
             </h2>
 
-            {/* TODO: replace with the real about text later */}
+            <p style={{ fontSize: '14px', color: '#666', textAlign: 'center', lineHeight: 1.6, margin: '0 0 12px' }}>
+              Torget er vefsíða þar sem þú getur keypt og selt notaðar vörur á Íslandi.
+            </p>
+            <p style={{ fontSize: '14px', color: '#666', textAlign: 'center', lineHeight: 1.6, margin: '0 0 12px' }}>
+              Seldu föt og skó, húsgögn, bækur, raftæki og margt fleira. Vertu í beinu samband við kaupendur og seljendur um land allt.
+            </p>
             <p style={{ fontSize: '14px', color: '#666', textAlign: 'center', lineHeight: 1.6, margin: 0 }}>
-              Texti kemur fljótlega.
+              Gefðu hlutunum þínum nýtt líf.
             </p>
           </div>
         </div>

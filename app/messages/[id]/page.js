@@ -87,6 +87,7 @@ export default function MessageThread() {
   const other = user?.id === conv.buyer_id ? conv.seller : conv.buyer
   const img = conv.listings?.images?.split(',')[0]
   const avatarInitial = other?.name?.[0]?.toUpperCase() || '?'
+  console.log('other:', other)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', maxWidth: '100vw' }}>

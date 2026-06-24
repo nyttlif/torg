@@ -87,7 +87,6 @@ export default function MessageThread() {
   const other = user?.id === conv.buyer_id ? conv.seller : conv.buyer
   const img = conv.listings?.images?.split(',')[0]
   const avatarInitial = other?.name?.[0]?.toUpperCase() || '?'
-  console.log('other:', other)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', maxWidth: '100vw' }}>
@@ -99,15 +98,17 @@ export default function MessageThread() {
           <button onClick={() => router.back()} style={{ color: '#111', background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', flexShrink: 0 }}>←</button>
           {img && <Link href={'/listings/' + conv.listings?.id} style={{ flexShrink: 0 }}><img src={img} style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', display: 'block' }} /></Link>}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <div style={{ width: '18px', height: '18px', borderRadius: '50%', overflow: 'hidden', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '600', color: '#555', flexShrink: 0 }}>
-                {other?.avatar_url
-                  ? <img src={other.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : avatarInitial
-                }
+            <Link href={'/profile/' + other?.id} style={{ textDecoration: 'none', color: 'inherit' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <div style={{ width: '18px', height: '18px', borderRadius: '50%', overflow: 'hidden', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '600', color: '#555', flexShrink: 0 }}>
+                  {other?.avatar_url
+                    ? <img src={other.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : avatarInitial
+                  }
+                </div>
+                <div style={{ fontWeight: '500', fontSize: '14px' }}>{other?.name}</div>
               </div>
-              <div style={{ fontWeight: '500', fontSize: '14px' }}>{other?.name}</div>
-            </div>
+            </Link>
             <Link href={'/listings/' + conv.listings?.id} style={{ fontSize: '12px', color: '#888', textDecoration: 'none' }}>
               {conv.listings?.title} · {conv.listings?.price?.toLocaleString('is-IS')} kr.
             </Link>

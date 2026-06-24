@@ -187,9 +187,9 @@ export default function ListingPage() {
 
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 20px' }}>
 
-        {listing.category_path && (
-          <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '16px' }}>{listing.category_path}</div>
-        )}
+        <div style={{ marginBottom: '16px' }}>
+          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#111', padding: 0 }}>←</button>
+        </div>
 
         <div className="listing-layout">
 

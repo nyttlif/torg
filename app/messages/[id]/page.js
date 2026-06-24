@@ -21,7 +21,7 @@ export default function MessageThread() {
       if (!session) { router.push('/auth'); return }
       setUser(session.user)
       fetchConv(session.user.id)
-      fetchMessages()
+      fetchMessages(session.user.id)
     })
   }, [id])
 
@@ -48,22 +48,20 @@ export default function MessageThread() {
     setConv(data)
   }
 
-  const fetchMessages = async () => {
+  const fetchMessages = async (uid) => {
     const { data } = await supabase
       .from('messages')
       .select('*, profiles(name)')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true })
     setMessages(data || [])
-    // Mark all messages in this conversation as read
-    if (user) {
+    if (uid) {
       await supabase
         .from('messages')
         .update({ read: true })
         .eq('conversation_id', parseInt(id))
-        .neq('sender_id', user.id)
+        .neq('sender_id', uid)
         .eq('read', false)
-      // Tell navbar to refresh unread count
       window.dispatchEvent(new Event('messages-read'))
     }
   }

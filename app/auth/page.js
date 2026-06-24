@@ -49,23 +49,23 @@ export function AuthModal({ onClose, onSuccess }) {
         {mode === 'signup' && (
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>Nafn</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Jón Jónsson" style={inputStyle} />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
           </div>
         )}
 
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>Netfang</label>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jon@example.is" style={inputStyle} />
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
         </div>
 
         <div style={{ marginBottom: '24px' }}>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>Lykilorð</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" style={inputStyle} onKeyDown={e => e.key === 'Enter' && handle()} />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} onKeyDown={e => e.key === 'Enter' && handle()} />
         </div>
 
         {error && (
           <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: '6px', fontSize: '14px', marginBottom: '16px', border: '1px solid #fecaca' }}>
-            {error}
+            {error.toLowerCase().includes('email') || error.toLowerCase().includes('phone') ? 'Netfang vantar' : error}
           </div>
         )}
 
@@ -75,7 +75,7 @@ export function AuthModal({ onClose, onSuccess }) {
         </button>
 
         <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' }}>
-          {mode === 'login' ? 'Ekki með aðgang?' : 'Ertu þegar með aðgang?'}{' '}
+          {mode === 'login' ? 'Áttu ekki aðgang?' : 'Ertu þegar með aðgang?'}{' '}
           <button onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError('') }}
             style={{ color: '#111', fontWeight: '500', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
             {mode === 'login' ? 'Stofna aðgang' : 'Skrá inn'}

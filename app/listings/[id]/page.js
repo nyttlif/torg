@@ -223,8 +223,8 @@ export default function ListingPage() {
                     return (
                       <div
                         key={realIndex}
-                        onClick={() => isLast ? openLightbox(realIndex) : setActiveImg(realIndex)}
-                        style={{ aspectRatio: '3/4', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', position: 'relative', border: activeImg === realIndex && !isLast ? '2px solid #111' : '2px solid transparent' }}
+                        onClick={() => openLightbox(realIndex)}
+                        style={{ aspectRatio: '3/4', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', position: 'relative', border: '2px solid transparent' }}
                       >
                         <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: activeImg === realIndex ? 1 : 0.7 }} />
                         {isLast && (

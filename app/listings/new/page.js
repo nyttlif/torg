@@ -85,22 +85,18 @@ export default function NewListing() {
   }
 
   const onDragEnterImg = (i) => {
-    dragTarget.current = i
+    if (dragItem.current === null || dragItem.current === i) return
+    setImages(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(dragItem.current, 1)
+      next.splice(i, 0, moved)
+      dragItem.current = i
+      return next
+    })
   }
 
   const onDragEndImg = () => {
-    const from = dragItem.current
-    const to = dragTarget.current
-    if (from !== null && to !== null && from !== to) {
-      setImages(prev => {
-        const next = [...prev]
-        const [moved] = next.splice(from, 1)
-        next.splice(to, 0, moved)
-        return next
-      })
-    }
     dragItem.current = null
-    dragTarget.current = null
     isDragging.current = false
   }
 
@@ -165,12 +161,12 @@ export default function NewListing() {
                     key={img.id}
                     draggable
                     onDragStart={(e) => { e.stopPropagation(); onDragStartImg(i) }}
-                    onDragEnter={(e) => { e.stopPropagation(); onDragEnterImg(i) }}
-                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragEnterImg(i) }}
+                    onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); onDragEnterImg(i) }}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                     onDragEnd={onDragEndImg}
                     style={{ position: 'relative', width: '96px', height: '128px', cursor: 'grab', flexShrink: 0 }}
                   >
-                    <img src={img.preview} alt="" style={{ width: '96px', height: '128px', objectFit: 'cover', borderRadius: '8px', border: i === 0 ? '2px solid #111' : '1px solid #e5e5e5', opacity: img.uploading ? 0.5 : 1, display: 'block' }} />
+                    <img src={img.preview} alt="" style={{ width: '96px', height: '128px', objectFit: 'cover', borderRadius: '8px', border: i === 0 ? '2px solid #111' : '1px solid #e5e5e5', opacity: img.uploading ? 0.5 : 1, display: 'block', pointerEvents: 'none' }} />
                     {i === 0 && <div style={{ position: 'absolute', bottom: '5px', left: '5px', background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '10px', padding: '2px 5px', borderRadius: '3px' }}>Forsíða</div>}
                     {img.uploading && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', background: 'rgba(255,255,255,0.4)' }}>

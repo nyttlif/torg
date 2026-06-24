@@ -153,8 +153,9 @@ export default function NewListing() {
           <label style={label}>Myndir</label>
           <div
             onDragOver={e => { e.preventDefault(); if (!isDragging.current) setDragOver(true) }}
-            onDragLeave={() => { if (!isDragging.current) setDragOver(false) }}
-            onDrop={e => { if (!isDragging.current) onDrop(e) }}
+            onDragEnter={e => { e.preventDefault(); if (!isDragging.current) setDragOver(true) }}
+            onDragLeave={e => { if (!isDragging.current) setDragOver(false) }}
+            onDrop={e => { e.preventDefault(); if (!isDragging.current) { setDragOver(false); processFiles(e.dataTransfer.files) } }}
             style={{ border: '2px dashed ' + (dragOver ? '#111' : '#e0e0e0'), borderRadius: '12px', padding: '20px', background: dragOver ? '#f5f5f5' : '#fafafa', minHeight: '80px' }}
           >
             {images.length > 0 && (
@@ -163,10 +164,10 @@ export default function NewListing() {
                   <div
                     key={img.id}
                     draggable
-                    onDragStart={() => onDragStartImg(i)}
-                    onDragEnter={() => onDragEnterImg(i)}
+                    onDragStart={(e) => { e.stopPropagation(); onDragStartImg(i) }}
+                    onDragEnter={(e) => { e.stopPropagation(); onDragEnterImg(i) }}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragEnterImg(i) }}
                     onDragEnd={onDragEndImg}
-                    onDragOver={e => e.preventDefault()}
                     style={{ position: 'relative', width: '96px', height: '128px', cursor: 'grab', flexShrink: 0 }}
                   >
                     <img src={img.preview} alt="" style={{ width: '96px', height: '128px', objectFit: 'cover', borderRadius: '8px', border: i === 0 ? '2px solid #111' : '1px solid #e5e5e5', opacity: img.uploading ? 0.5 : 1, display: 'block' }} />

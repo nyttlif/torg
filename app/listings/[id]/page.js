@@ -361,7 +361,9 @@ export default function ListingPage() {
         }
         .main-img { width: 380px; flex-shrink: 0; aspect-ratio: 3/4; max-height: 520px; }
         .listing-info { position: static; }
-        .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; grid-auto-rows: 1fr; align-items: start; }
+        .mini-card-img { width: 100%; aspect-ratio: 3/4; background: #f0f0f0; overflow: hidden; }
+        .mini-card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .related-mobile { display: none; }
         @media (max-width: 768px) {
           .listing-layout { grid-template-columns: 1fr; gap: 16px; justify-content: stretch; }
@@ -378,10 +380,10 @@ export default function ListingPage() {
 function MiniCard({ listing }) {
   const img = listing.images ? listing.images.split(',')[0] : null
   return (
-    <Link href={'/listings/' + listing.id} style={{ textDecoration: 'none', color: 'inherit' }}>
+    <Link href={'/listings/' + listing.id} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
       <div style={{ background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e5e5e5' }}>
-        <div style={{ width: '100%', aspectRatio: '3/4', background: '#f0f0f0', overflow: 'hidden' }}>
-          {img ? <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>📦</div>}
+        <div className="mini-card-img">
+          {img ? <img src={img} alt={listing.title} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>📦</div>}
         </div>
         <div style={{ padding: '8px' }}>
           <div style={{ fontSize: '12px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.title}</div>

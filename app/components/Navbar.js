@@ -42,7 +42,10 @@ export default function Navbar() {
     if (!user) return
     const ch = supabase.channel('msgs-' + user.id).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => fetchUnreadMessages(user.id)).subscribe()
     const ch2 = supabase.channel('notifs-' + user.id).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + user.id }, payload => { setNotifications(prev => [payload.new, ...prev]); setUnreadNotifs(prev => prev + 1) }).subscribe()
-    return () => { supabase.removeChannel(ch); supabase.removeChannel(ch2) }
+    // Listen for messages being read in a thread
+    const onRead = () => fetchUnreadMessages(user.id)
+    window.addEventListener('messages-read', onRead)
+    return () => { supabase.removeChannel(ch); supabase.removeChannel(ch2); window.removeEventListener('messages-read', onRead) }
   }, [user])
 
   // Close menu on route change

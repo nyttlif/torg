@@ -55,6 +55,17 @@ export default function MessageThread() {
       .eq('conversation_id', id)
       .order('created_at', { ascending: true })
     setMessages(data || [])
+    // Mark all messages in this conversation as read
+    if (user) {
+      await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('conversation_id', parseInt(id))
+        .neq('sender_id', user.id)
+        .eq('read', false)
+      // Tell navbar to refresh unread count
+      window.dispatchEvent(new Event('messages-read'))
+    }
   }
 
   const send = async () => {

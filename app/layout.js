@@ -4,6 +4,7 @@ import Footer from './components/Footer'
 export const metadata = {
   title: 'Torg',
   description: 'Kauptu og seldu á Torg',
+  icons: { icon: '/favicon.svg' },
 }
 
 export default function RootLayout({ children }) {

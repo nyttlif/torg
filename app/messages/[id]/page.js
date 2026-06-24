@@ -84,7 +84,9 @@ export default function MessageThread() {
 
   if (!conv) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Hleður...</div></>
 
-  const other = user?.id === conv.buyer_id ? conv.seller : conv.buyer
+  const isBuyer = user?.id === conv.buyer_id
+  const other = isBuyer ? conv.seller : conv.buyer
+  const otherId = isBuyer ? conv.seller_id : conv.buyer_id
   const img = conv.listings?.images?.split(',')[0]
   const avatarInitial = other?.name?.[0]?.toUpperCase() || '?'
 
@@ -98,7 +100,7 @@ export default function MessageThread() {
           <button onClick={() => router.back()} style={{ color: '#111', background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', flexShrink: 0 }}>←</button>
           {img && <Link href={'/listings/' + conv.listings?.id} style={{ flexShrink: 0 }}><img src={img} style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', display: 'block' }} /></Link>}
           <div>
-            <Link href={'/profile/' + other?.id} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <Link href={'/profile/' + otherId} style={{ textDecoration: 'none', color: 'inherit' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                 <div style={{ width: '18px', height: '18px', borderRadius: '50%', overflow: 'hidden', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '600', color: '#555', flexShrink: 0 }}>
                   {other?.avatar_url

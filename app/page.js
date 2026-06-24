@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from './components/Navbar'
 import { supabase } from '@/lib/supabase'
 import { CATEGORIES, LOCATIONS, getSizes } from '@/lib/categories'
 
@@ -352,16 +351,8 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Navbar />
-      <div style={{ flex: 1 }}>
-        <Suspense fallback={<div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Hleður...</div>}>
-          <HomeContent />
-        </Suspense>
-      </div>
-      <footer style={{ borderTop: '1px solid #e5e5e5', padding: '20px', textAlign: 'center' }}>
-        <Link href="/um-torget" style={{ fontSize: '13px', color: '#888', textDecoration: 'none' }}>Um Torget</Link>
-      </footer>
-    </div>
+    <Suspense fallback={<div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Hleður...</div>}>
+      <HomeContent />
+    </Suspense>
   )
 }

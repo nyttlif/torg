@@ -1,150 +1,148 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '../../components/Navbar'
 import { supabase } from '@/lib/supabase'
 
-export default function MessageThread() {
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now() - new Date(ts)) / 1000)
+  if (diff < 60) return 'Rétt í þessu'
+  if (diff < 3600) return Math.floor(diff / 60) + ' mín síðan'
+  if (diff < 86400) return Math.floor(diff / 3600) + ' klst síðan'
+  if (diff < 86400 * 7) return Math.floor(diff / 86400) + ' dögum síðan'
+  if (diff < 86400 * 30) return Math.floor(diff / 86400 / 7) + ' vikum síðan'
+  if (diff < 86400 * 365) return Math.floor(diff / 86400 / 30) + ' mánuðum síðan'
+  return Math.floor(diff / 86400 / 365) + ' árum síðan'
+}
+
+export default function ProfilePage() {
   const { id } = useParams()
-  const router = useRouter()
+  const [profile, setProfile] = useState(null)
+  const [listings, setListings] = useState([])
+  const [tab, setTab] = useState('active')
   const [user, setUser] = useState(null)
-  const [conv, setConv] = useState(null)
-  const [messages, setMessages] = useState([])
-  const [text, setText] = useState('')
-  const [sending, setSending] = useState(false)
-  const bottomRef = useRef(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) { router.push('/auth'); return }
-      setUser(session.user)
-      fetchConv(session.user.id)
-      fetchMessages(session.user.id)
-    })
+    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
+    fetchProfile()
+    fetchListings()
   }, [id])
 
-  useEffect(() => {
-    const channel = supabase.channel('messages-' + id)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'conversation_id=eq.' + id }, payload => {
-        setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new])
-      })
-      .subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [id])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  const fetchConv = async (uid) => {
-    const { data } = await supabase
-      .from('conversations')
-      .select('*, listings(id, title, images, price, status), buyer:profiles!conversations_buyer_id_fkey(id, name, avatar_url), seller:profiles!conversations_seller_id_fkey(id, name, avatar_url)')
-      .eq('id', id)
-      .single()
-    if (!data || (data.buyer_id !== uid && data.seller_id !== uid)) { router.push('/messages'); return }
-    setConv(data)
+  const fetchProfile = async () => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', id).single()
+    setProfile(data)
+    setLoading(false)
   }
 
-  const fetchMessages = async (uid) => {
+  const fetchListings = async () => {
     const { data } = await supabase
-      .from('messages')
-      .select('*, profiles(name)')
-      .eq('conversation_id', id)
-      .order('created_at', { ascending: true })
-    setMessages(data || [])
-    if (uid) {
-      await supabase
-        .from('messages')
-        .update({ read: true })
-        .eq('conversation_id', parseInt(id))
-        .neq('sender_id', uid)
-        .eq('read', false)
-      window.dispatchEvent(new Event('messages-read'))
-    }
+      .from('listings')
+      .select('*')
+      .eq('user_id', id)
+      .order('created_at', { ascending: false })
+    setListings(data || [])
   }
 
-  const send = async () => {
-    if (!text.trim() || sending) return
-    setSending(true)
-    const content = text.trim()
-    setText('')
-    const { data } = await supabase
-      .from('messages')
-      .insert({ conversation_id: parseInt(id), sender_id: user.id, content })
-      .select('*, profiles(name)')
-      .single()
-    if (data) setMessages(prev => [...prev, data])
-    setSending(false)
-  }
+  const isOwn = user?.id === id
+  const activeListings = listings.filter(l => l.status === 'active')
+  const soldListings = listings.filter(l => l.status === 'sold')
+  const shown = tab === 'active' ? activeListings : soldListings
 
-  const onKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }
+  if (loading) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Hleður...</div></>
+  if (!profile) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Notandi fannst ekki</div></>
 
-  if (!conv) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Hleður...</div></>
-
-  const other = user?.id === conv.buyer_id ? conv.seller : conv.buyer
-  const img = conv.listings?.images?.split(',')[0]
-  const avatarInitial = other?.name?.[0]?.toUpperCase() || '?'
+  const hasRating = profile.rating_count > 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', maxWidth: '100vw' }}>
+    <div>
       <Navbar />
-      <div style={{ maxWidth: '700px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, padding: '0 16px', minWidth: 0, overflow: 'hidden' }}>
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '32px 20px' }}>
 
         {/* Header */}
-        <div style={{ padding: '16px 0', borderBottom: '1px solid #e5e5e5', display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button onClick={() => router.back()} style={{ color: '#111', background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', flexShrink: 0 }}>←</button>
-          {img && <Link href={'/listings/' + conv.listings?.id} style={{ flexShrink: 0 }}><img src={img} style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', display: 'block' }} /></Link>}
-          <div>
-            <Link href={'/profile/' + other?.id} style={{ textDecoration: 'none', color: 'inherit' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                <div style={{ width: '18px', height: '18px', borderRadius: '50%', overflow: 'hidden', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '600', color: '#555', flexShrink: 0 }}>
-                  {other?.avatar_url
-                    ? <img src={other.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : avatarInitial
-                  }
-                </div>
-                <div style={{ fontWeight: '500', fontSize: '14px' }}>{other?.name}</div>
-              </div>
-            </Link>
-            <Link href={'/listings/' + conv.listings?.id} style={{ fontSize: '12px', color: '#888', textDecoration: 'none' }}>
-              {conv.listings?.title} · {conv.listings?.price?.toLocaleString('is-IS')} kr.
-            </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '32px' }}>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#e0e0e0', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '30px', flexShrink: 0 }}>
+            {profile.avatar_url
+              ? <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : profile.name?.[0]?.toUpperCase()
+            }
           </div>
+          <div style={{ flex: 1 }}>
+            <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '6px' }}>{profile.name}</h1>
+
+            {/* Rating */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              {hasRating ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f5f5f5', borderRadius: '20px', padding: '3px 10px' }}>
+                    <span style={{ fontSize: '13px' }}>★</span>
+                    <span style={{ fontSize: '13px', fontWeight: '600' }}>{profile.rating.toFixed(1)}</span>
+                  </div>
+                  <span style={{ fontSize: '13px', color: '#888' }}>{profile.rating_count} umsagnir</span>
+                  <span style={{ fontSize: '13px', color: '#ccc' }}>·</span>
+                </>
+              ) : (
+                <span style={{ fontSize: '13px', color: '#aaa' }}>Engar umsagnir ·</span>
+              )}
+              <span style={{ fontSize: '13px', color: '#888' }}>{activeListings.length} virkar auglýsingar</span>
+            </div>
+
+            {profile.bio && <p style={{ fontSize: '14px', color: '#555', marginTop: '4px' }}>{profile.bio}</p>}
+          </div>
+          {isOwn && (
+            <Link href="/profile/edit" style={{ padding: '8px 16px', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', fontWeight: '500', textDecoration: 'none', color: '#111', flexShrink: 0 }}>
+              Breyta prófíl
+            </Link>
+          )}
         </div>
 
-        {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {messages.map(m => {
-            const mine = m.sender_id === user?.id
-            return (
-              <div key={m.id} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
-                <div style={{ maxWidth: '70%', padding: '10px 14px', borderRadius: mine ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: mine ? '#111' : '#f0f0f0', color: mine ? '#fff' : '#111', fontSize: '14px', lineHeight: '1.5' }}>
-                  {m.content}
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', borderBottom: '1px solid #e5e5e5' }}>
+          {[
+            { key: 'active', label: 'Til sölu', count: activeListings.length },
+            { key: 'sold', label: 'Selt', count: soldListings.length },
+          ].map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              style={{ padding: '10px 16px', background: 'none', border: 'none', borderBottom: tab === t.key ? '2px solid #111' : '2px solid transparent', fontSize: '14px', fontWeight: tab === t.key ? '600' : '400', cursor: 'pointer', color: tab === t.key ? '#111' : '#888', marginBottom: '-1px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+              {t.label}
+              <span style={{ background: tab === t.key ? '#111' : '#f0f0f0', color: tab === t.key ? '#fff' : '#888', borderRadius: '10px', padding: '1px 7px', fontSize: '11px' }}>{t.count}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Grid */}
+        {shown.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px', color: '#999' }}>
+            {isOwn && tab === 'active' ? (
+              <>
+                <p style={{ marginBottom: '16px' }}>Þú hefur ekki birt neinar auglýsingar ennþá</p>
+                <Link href="/listings/new" style={{ background: '#111', color: '#fff', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', fontSize: '14px' }}>+ Selja vöru</Link>
+              </>
+            ) : tab === 'active' ? 'Engar virkar auglýsingar' : 'Engar seldar vörur'}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
+            {shown.map(l => (
+              <Link key={l.id} href={'/listings/' + l.id} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div style={{ background: '#fff', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e5e5e5' }}>
+                  <div style={{ aspectRatio: '3/4', background: '#f0f0f0' }}>
+                    {l.images
+                      ? <img src={l.images.split(',')[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>📦</div>
+                    }
+                  </div>
+                  <div style={{ padding: '10px' }}>
+                    <div style={{ fontWeight: '500', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.title}</div>
+                    <div style={{ fontWeight: '700', fontSize: '15px', marginTop: '2px' }}>{l.price.toLocaleString('is-IS')} kr.</div>
+                    <div style={{ fontSize: '11px', color: '#bbb', marginTop: '3px' }}>{timeAgo(l.created_at)}</div>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-          <div ref={bottomRef} />
-        </div>
-
-        {/* Input */}
-        <div style={{ padding: '12px 0 20px', borderTop: '1px solid #e5e5e5', display: 'flex', gap: '8px' }}>
-          <textarea
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={onKey}
-            placeholder="Skrifaðu skilaboð..."
-            rows={1}
-            style={{ flex: 1, padding: '10px 14px', border: '1px solid #e5e5e5', borderRadius: '24px', fontSize: '14px', outline: 'none', resize: 'none', lineHeight: '1.5' }}
-          />
-          <button onClick={send} disabled={sending || !text.trim()}
-            style={{ padding: '10px 18px', background: text.trim() ? '#111' : '#e5e5e5', color: text.trim() ? '#fff' : '#999', border: 'none', borderRadius: '24px', fontSize: '14px', fontWeight: '500', cursor: text.trim() ? 'pointer' : 'default' }}>
-            Senda
-          </button>
-        </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

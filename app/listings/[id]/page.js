@@ -361,12 +361,12 @@ export default function ListingPage() {
         }
         .main-img { width: 380px; flex-shrink: 0; aspect-ratio: 3/4; max-height: 520px; }
         .listing-info { position: static; }
-        .mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
         .related-mobile { display: none; }
         @media (max-width: 768px) {
           .listing-layout { grid-template-columns: 1fr; gap: 16px; justify-content: stretch; }
           .main-img { width: 100%; flex-shrink: 1; aspect-ratio: 3/4; max-height: none; }
-          .mini-grid { grid-template-columns: repeat(2, 1fr); }
+          .mini-grid { grid-template-columns: repeat(3, 1fr); }
           .related-desktop { display: none !important; }
           .related-mobile { display: block; }
         }
@@ -380,8 +380,8 @@ function MiniCard({ listing }) {
   return (
     <Link href={'/listings/' + listing.id} style={{ textDecoration: 'none', color: 'inherit' }}>
       <div style={{ background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e5e5e5' }}>
-        <div style={{ aspectRatio: '3/4', background: '#f0f0f0', overflow: 'hidden' }}>
-          {img ? <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>📦</div>}
+        <div style={{ width: '100%', aspectRatio: '3/4', background: '#f0f0f0', overflow: 'hidden' }}>
+          {img ? <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>📦</div>}
         </div>
         <div style={{ padding: '8px' }}>
           <div style={{ fontSize: '12px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.title}</div>

@@ -85,7 +85,7 @@ function HomeContent() {
   const filterCount = [mainCat, subCat, size, location, minPrice, maxPrice].filter(Boolean).length
 
   return (
-    <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '20px 20px' }}>
+    <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '20px 20px 80px' }}>
 
       {/* Desktop filter bar */}
       <div className="desktop-filters" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>

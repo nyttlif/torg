@@ -135,7 +135,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav style={{ background: '#fff', borderBottom: '1px solid #e5e5e5', padding: '0 16px', height: '56px', display: 'flex', alignItems: 'center', gap: '10px', position: 'sticky', top: 0, zIndex: 100 }}>
+      <nav style={{ background: '#fff', borderBottom: '1px solid #e5e5e5', padding: '0 16px', height: '56px', display: 'flex', alignItems: 'center', gap: '16px', position: 'sticky', top: 0, zIndex: 100 }}>
 
         <Link href="/" style={{ fontWeight: '700', fontSize: '20px', color: '#111', textDecoration: 'none', letterSpacing: '-0.5px', flexShrink: 0 }}>
           Torget

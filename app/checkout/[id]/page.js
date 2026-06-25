@@ -154,6 +154,7 @@ export default function CheckoutPage() {
     fields.itemunitamount_0 = String(listing.price)
     fields.itemamount_0 = String(listing.price)
 
+    console.log('BORGUN_FIELDS:', JSON.stringify(fields))
     setBorgunFields(fields)
   }
 

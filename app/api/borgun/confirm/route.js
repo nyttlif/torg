@@ -76,3 +76,9 @@ export async function POST(request) {
     })
   }
 }
+
+export async function GET() {
+  return new NextResponse('<PaymentNotification>Accepted</PaymentNotification>', {
+    headers: { 'Content-Type': 'application/xml' }
+  })
+}

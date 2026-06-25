@@ -26,8 +26,8 @@ const toSRGB = (file) => new Promise(resolve => {
 })
 
 const WEIGHT_OPTIONS = [
-  { value: 'small', label: 'Létt (0–10 kg)', desc: 'Fatnaður, skór, smávörur' },
-  { value: 'large', label: 'Þung (10–30 kg)', desc: 'Húsgögn, tæki, stórar vörur' },
+  { value: 'small', label: 'Lítið (0–10 kg)', desc: 'Fatnaður, skór, smávörur' },
+  { value: 'large', label: 'Stórt (10–30 kg)', desc: 'Húsgögn, tæki, stórar vörur' },
 ]
 
 export default function NewListing() {
@@ -290,7 +290,7 @@ export default function NewListing() {
 
         {/* Weight class */}
         <div style={{ marginBottom: '24px' }}>
-          <label style={label}>Þyngd</label>
+          <label style={label}>Stærð</label>
           <div style={{ display: 'flex', gap: '10px' }}>
             {WEIGHT_OPTIONS.map(opt => (
               <button key={opt.value} onClick={() => setWeightClass(opt.value)}

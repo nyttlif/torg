@@ -93,7 +93,6 @@ export default function ListingPage() {
   const [offerOpen, setOfferOpen] = useState(false)
   const [offerAmount, setOfferAmount] = useState('')
   const [offerSending, setOfferSending] = useState(false)
-  const [offerSent, setOfferSent] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -145,30 +144,34 @@ export default function ListingPage() {
 
   const openLightbox = (index) => { setLightboxStart(index); setLightboxOpen(true) }
 
-  const getOrCreateConv = async () => {
-    const { data: ex } = await supabase.from('conversations').select('id').eq('listing_id', listing.id).eq('buyer_id', user.id).single()
-    if (ex) return ex.id
-    const { data: conv } = await supabase.from('conversations').insert({ listing_id: listing.id, buyer_id: user.id, seller_id: listing.user_id }).select().single()
-    return conv.id
-  }
-
-  const contactSeller = async () => {
+  // Navigate to existing conv or just go to messages — don't create conv yet
+  const openMessages = async () => {
     if (!user) { router.push('/auth'); return }
     setContacting(true)
-    const convId = await getOrCreateConv()
-    router.push('/messages/' + convId)
-  }
-
-  const handleBuy = () => {
-    if (!user) { router.push('/auth'); return }
-    router.push('/checkout/' + id)
+    const { data: ex } = await supabase.from('conversations').select('id').eq('listing_id', listing.id).eq('buyer_id', user.id).single()
+    if (ex) {
+      router.push('/messages/' + ex.id)
+    } else {
+      // Pass listing info via URL so messages page can create conv on first send
+      router.push('/messages/new?listing=' + id)
+    }
   }
 
   const sendOffer = async () => {
     if (!user) { router.push('/auth'); return }
     if (!offerAmount || parseInt(offerAmount) <= 0) return
     setOfferSending(true)
-    const convId = await getOrCreateConv()
+
+    // Get or create conversation
+    let convId
+    const { data: ex } = await supabase.from('conversations').select('id').eq('listing_id', listing.id).eq('buyer_id', user.id).single()
+    if (ex) {
+      convId = ex.id
+    } else {
+      const { data: newConv } = await supabase.from('conversations').insert({ listing_id: listing.id, buyer_id: user.id, seller_id: listing.user_id }).select().single()
+      convId = newConv.id
+    }
+
     await supabase.from('offers').insert({
       conversation_id: convId,
       listing_id: parseInt(id),
@@ -177,10 +180,14 @@ export default function ListingPage() {
       amount: parseInt(offerAmount),
       status: 'pending'
     })
-    setOfferSent(true)
     setOfferSending(false)
     setOfferOpen(false)
     router.push('/messages/' + convId)
+  }
+
+  const handleBuy = () => {
+    if (!user) { router.push('/auth'); return }
+    router.push('/checkout/' + id)
   }
 
   const markStatus = async (status) => {
@@ -217,13 +224,8 @@ export default function ListingPage() {
             <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Senda tilboð</h2>
             <p style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>Listaverð: {listing.price.toLocaleString('is-IS')} kr.</p>
             <div style={{ position: 'relative', marginBottom: '16px' }}>
-              <input
-                type="number"
-                value={offerAmount}
-                onChange={e => setOfferAmount(e.target.value)}
-                placeholder="Tilboðsverð"
-                style={{ width: '100%', padding: '12px 44px 12px 14px', fontSize: '16px', border: '1px solid #e5e5e5', borderRadius: '8px', outline: 'none' }}
-              />
+              <input type="number" value={offerAmount} onChange={e => setOfferAmount(e.target.value)} placeholder="Tilboðsverð"
+                style={{ width: '100%', padding: '12px 44px 12px 14px', fontSize: '16px', border: '1px solid #e5e5e5', borderRadius: '8px', outline: 'none' }} />
               <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#999', fontSize: '14px' }}>kr.</span>
             </div>
             <button onClick={sendOffer} disabled={offerSending || !offerAmount}
@@ -240,7 +242,6 @@ export default function ListingPage() {
         </div>
 
         <div className="listing-layout">
-          {/* Images */}
           <div>
             <div style={{ display: 'flex', gap: '6px' }}>
               <div onClick={() => openLightbox(activeImg)} className="main-img" style={{ borderRadius: '10px', overflow: 'hidden', position: 'relative', cursor: 'zoom-in' }}>
@@ -263,11 +264,7 @@ export default function ListingPage() {
                     return (
                       <div key={realIndex} onClick={() => openLightbox(realIndex)} style={{ aspectRatio: '3/4', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}>
                         <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.8 }} />
-                        {isLast && (
-                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', fontWeight: '700' }}>
-                            +{imgs.length - THUMB_COUNT - 1}
-                          </div>
-                        )}
+                        {isLast && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', fontWeight: '700' }}>+{imgs.length - THUMB_COUNT - 1}</div>}
                       </div>
                     )
                   })}
@@ -276,7 +273,6 @@ export default function ListingPage() {
             </div>
           </div>
 
-          {/* Right panel */}
           <div className="listing-info">
             <h1 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '6px', lineHeight: '1.3' }}>{listing.title}</h1>
             <div style={{ fontSize: '26px', fontWeight: '700', marginBottom: '16px' }}>{listing.price.toLocaleString('is-IS')} kr.</div>
@@ -324,8 +320,8 @@ export default function ListingPage() {
                   Kaupa — {listing.price.toLocaleString('is-IS')} kr.
                 </button>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={contactSeller} disabled={contacting} style={{ flex: 1, background: '#fff', color: '#111', padding: '11px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
-                    {contacting ? 'Augnablik...' : 'Hafa samband'}
+                  <button onClick={openMessages} disabled={contacting} style={{ flex: 1, background: '#fff', color: '#111', padding: '11px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
+                    {contacting ? 'Augnablik...' : 'Senda skilaboð'}
                   </button>
                   <button onClick={() => setOfferOpen(true)} style={{ flex: 1, background: '#fff', color: '#111', padding: '11px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
                     Senda tilboð

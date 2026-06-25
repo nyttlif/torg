@@ -1,15 +1,26 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Script from 'next/script'
 import Navbar from '../../components/Navbar'
 import { supabase } from '@/lib/supabase'
 
-// Dropp pricing (incl. VAT) based on weight class and delivery type
+const CAPITAL_LOCATIONS = ['Reykjavík', 'Kópavogur', 'Hafnarfjörður', 'Garðabær', 'Mosfellsbær', 'Seltjarnarnes', 'Álftanes']
+
 const SHIPPING_PRICES = {
   dropp: { small: 870, large: 1820 },
   shipping: { small: 1410, large: 2370 },
+  dropp_other: { small: 1075, large: 2380 },
+  shipping_other: { small: 1660, large: 3050 },
+}
+
+function getShippingFee(deliveryType, weightClass, sellerLocation) {
+  const isCapital = CAPITAL_LOCATIONS.includes(sellerLocation)
+  if (deliveryType === 'dropp') {
+    return isCapital ? SHIPPING_PRICES.dropp[weightClass] : SHIPPING_PRICES.dropp_other[weightClass]
+  }
+  return isCapital ? SHIPPING_PRICES.shipping[weightClass] : SHIPPING_PRICES.shipping_other[weightClass]
 }
 
 export default function CheckoutPage() {
@@ -17,9 +28,11 @@ export default function CheckoutPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [listing, setListing] = useState(null)
+  const [sellerLocation, setSellerLocation] = useState('')
   const [loading, setLoading] = useState(true)
   const [placing, setPlacing] = useState(false)
   const [done, setDone] = useState(false)
+  const [convId, setConvId] = useState(null)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -44,15 +57,16 @@ export default function CheckoutPage() {
   const fetchListing = async () => {
     const { data } = await supabase
       .from('listings')
-      .select('*, profiles(id, name)')
+      .select('*, profiles(id, name, location)')
       .eq('id', id)
       .single()
     setListing(data)
+    setSellerLocation(data?.profiles?.location || '')
     setLoading(false)
   }
 
   const weightClass = listing?.weight_class || 'small'
-  const shippingFee = SHIPPING_PRICES[delivery]?.[weightClass] ?? SHIPPING_PRICES[delivery].small
+  const shippingFee = listing ? getShippingFee(delivery, weightClass, sellerLocation) : 0
   const platformFee = listing ? Math.round(listing.price * 0.08) : 0
   const total = listing ? listing.price + platformFee + shippingFee : 0
 
@@ -77,6 +91,20 @@ export default function CheckoutPage() {
 
     setPlacing(true)
 
+    // Get or create conversation
+    let conversationId = null
+    const { data: existingConv } = await supabase.from('conversations').select('id').eq('listing_id', listing.id).eq('buyer_id', user.id).single()
+    if (existingConv) {
+      conversationId = existingConv.id
+    } else {
+      const { data: newConv } = await supabase.from('conversations').insert({
+        listing_id: listing.id,
+        buyer_id: user.id,
+        seller_id: listing.user_id
+      }).select().single()
+      conversationId = newConv?.id
+    }
+
     const shippingData = delivery === 'dropp'
       ? { type: 'dropp', locationId: droppLocation.id, locationName: droppLocation.name, name, phone, email }
       : { type: 'shipping', name, phone, email, address, zipcode, city }
@@ -85,6 +113,7 @@ export default function CheckoutPage() {
       listing_id: listing.id,
       buyer_id: user.id,
       seller_id: listing.user_id,
+      conversation_id: conversationId,
       amount: listing.price,
       platform_fee: platformFee,
       shipping_fee: shippingFee,
@@ -97,6 +126,7 @@ export default function CheckoutPage() {
     if (orderError) { setError(orderError.message); setPlacing(false); return }
 
     await supabase.from('listings').update({ status: 'sold' }).eq('id', id)
+    setConvId(conversationId)
     setDone(true)
     setPlacing(false)
   }
@@ -109,10 +139,17 @@ export default function CheckoutPage() {
       <div style={{ maxWidth: '500px', margin: '80px auto', padding: '0 20px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
         <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '8px' }}>Pöntun móttekin!</h1>
-        <p style={{ color: '#666', marginBottom: '24px' }}>Seljandi hefur fengið tilkynningu og mun hafa samband vegna greiðslu og afhendingar.</p>
-        <button onClick={() => router.push('/')} style={{ background: '#111', color: '#fff', padding: '12px 24px', borderRadius: '8px', border: 'none', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
-          Til baka á forsíðu
-        </button>
+        <p style={{ color: '#666', marginBottom: '24px' }}>Seljandi hefur fengið tilkynningu og mun sjá um sendinguna fljótlega.</p>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+          {convId && (
+            <button onClick={() => router.push('/messages/' + convId)} style={{ background: '#111', color: '#fff', padding: '12px 24px', borderRadius: '8px', border: 'none', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
+              Opna samtal
+            </button>
+          )}
+          <button onClick={() => router.push('/')} style={{ background: '#fff', color: '#111', padding: '12px 24px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
+            Til baka á forsíðu
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -126,22 +163,14 @@ export default function CheckoutPage() {
 
   return (
     <div>
-      <Script
-        src="//app.dropp.is/dropp-locations.min.js"
-        data-store-id={storeId}
-        data-env="production"
-        strategy="afterInteractive"
-      />
-
+      <Script src="//app.dropp.is/dropp-locations.min.js" data-store-id={storeId} data-env="production" strategy="afterInteractive" />
       <Navbar />
       <div style={{ maxWidth: '560px', margin: '0 auto', padding: '40px 20px 80px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '32px' }}>Kaupa vöru</h1>
 
         {/* Listing summary */}
         <div style={{ display: 'flex', gap: '16px', padding: '16px', background: '#f9f9f9', borderRadius: '10px', marginBottom: '28px', alignItems: 'center' }}>
-          {listing.images && (
-            <img src={listing.images.split(',')[0]} style={{ width: '72px', height: '72px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
-          )}
+          {listing.images && <img src={listing.images.split(',')[0]} style={{ width: '72px', height: '72px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />}
           <div>
             <div style={{ fontWeight: '500', fontSize: '15px', marginBottom: '4px' }}>{listing.title}</div>
             <div style={{ fontSize: '13px', color: '#888' }}>Seljandi: {listing.profiles?.name}</div>
@@ -172,14 +201,13 @@ export default function CheckoutPage() {
             {droppLocation ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: '500', color: '#111' }}>{droppLocation.name || 'Staður valinn'}</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{droppLocation.name || 'Staður valinn'}</div>
                   <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{droppLocation.address || ''}</div>
                 </div>
                 <button onClick={openDroppMap} style={{ fontSize: '12px', color: '#666', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Breyta</button>
               </div>
             ) : (
-              <button onClick={openDroppMap}
-                style={{ width: '100%', padding: '14px', border: '2px dashed #e5e5e5', borderRadius: '8px', background: '#fafafa', cursor: 'pointer', fontSize: '14px', color: '#555', fontWeight: '500' }}>
+              <button onClick={openDroppMap} style={{ width: '100%', padding: '14px', border: '2px dashed #e5e5e5', borderRadius: '8px', background: '#fafafa', cursor: 'pointer', fontSize: '14px', color: '#555', fontWeight: '500' }}>
                 🗺 Velja Dropp afhendingarstað
               </button>
             )}
@@ -189,32 +217,31 @@ export default function CheckoutPage() {
         {/* Customer info */}
         <div style={{ marginBottom: '16px' }}>
           <label style={labelStyle}>Nafn</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Jón Jónsson" style={inputStyle} />
+          <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
         </div>
         <div style={{ marginBottom: '16px' }}>
           <label style={labelStyle}>Símanúmer</label>
-          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="777 7777" style={inputStyle} />
+          <input value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} />
         </div>
         <div style={{ marginBottom: delivery === 'shipping' ? '16px' : '24px' }}>
           <label style={labelStyle}>Netfang <span style={{ color: '#999', fontWeight: '400' }}>(valfrjálst)</span></label>
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="jon@example.is" style={inputStyle} />
+          <input value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
         </div>
 
-        {/* Shipping address */}
         {delivery === 'shipping' && (
           <>
             <div style={{ marginBottom: '16px' }}>
               <label style={labelStyle}>Heimilisfang</label>
-              <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Laugavegur 1" style={inputStyle} />
+              <input value={address} onChange={e => setAddress(e.target.value)} style={inputStyle} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '12px', marginBottom: '24px' }}>
               <div>
                 <label style={labelStyle}>Póstnúmer</label>
-                <input value={zipcode} onChange={e => setZipcode(e.target.value)} placeholder="101" style={inputStyle} />
+                <input value={zipcode} onChange={e => setZipcode(e.target.value)} style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Borg</label>
-                <input value={city} onChange={e => setCity(e.target.value)} placeholder="Reykjavík" style={inputStyle} />
+                <input value={city} onChange={e => setCity(e.target.value)} style={inputStyle} />
               </div>
             </div>
           </>
@@ -231,7 +258,7 @@ export default function CheckoutPage() {
             <span>{platformFee.toLocaleString('is-IS')} kr.</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: '#888' }}>
-            <span>Sending {weightClass === 'large' ? '(10–30 kg)' : '(0–10 kg)'}</span>
+            <span>Sendingargjald {weightClass === 'large' ? '(10–30 kg)' : '(0–10 kg)'}</span>
             <span>{shippingFee.toLocaleString('is-IS')} kr.</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '700', borderTop: '1px solid #e5e5e5', paddingTop: '10px', marginTop: '4px' }}>

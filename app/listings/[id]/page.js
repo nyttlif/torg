@@ -90,6 +90,10 @@ export default function ListingPage() {
   const [copied, setCopied] = useState(false)
   const [reported, setReported] = useState(false)
   const [contacting, setContacting] = useState(false)
+  const [offerOpen, setOfferOpen] = useState(false)
+  const [offerAmount, setOfferAmount] = useState('')
+  const [offerSending, setOfferSending] = useState(false)
+  const [offerSent, setOfferSent] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -160,6 +164,25 @@ export default function ListingPage() {
     router.push('/checkout/' + id)
   }
 
+  const sendOffer = async () => {
+    if (!user) { router.push('/auth'); return }
+    if (!offerAmount || parseInt(offerAmount) <= 0) return
+    setOfferSending(true)
+    const convId = await getOrCreateConv()
+    await supabase.from('offers').insert({
+      conversation_id: convId,
+      listing_id: parseInt(id),
+      buyer_id: user.id,
+      seller_id: listing.user_id,
+      amount: parseInt(offerAmount),
+      status: 'pending'
+    })
+    setOfferSent(true)
+    setOfferSending(false)
+    setOfferOpen(false)
+    router.push('/messages/' + convId)
+  }
+
   const markStatus = async (status) => {
     await supabase.from('listings').update({ status }).eq('id', id)
     fetchListing()
@@ -186,22 +209,41 @@ export default function ListingPage() {
       <Navbar />
       {lightboxOpen && <Lightbox imgs={imgs} startIndex={lightboxStart} onClose={() => setLightboxOpen(false)} />}
 
-      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 20px' }}>
+      {/* Offer modal */}
+      {offerOpen && (
+        <div onClick={() => setOfferOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '16px', padding: '32px', width: '90%', maxWidth: '400px', position: 'relative' }}>
+            <button onClick={() => setOfferOpen(false)} style={{ position: 'absolute', top: '16px', right: '20px', background: 'none', border: 'none', fontSize: '20px', color: '#999', cursor: 'pointer' }}>✕</button>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Senda tilboð</h2>
+            <p style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>Listaverð: {listing.price.toLocaleString('is-IS')} kr.</p>
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <input
+                type="number"
+                value={offerAmount}
+                onChange={e => setOfferAmount(e.target.value)}
+                placeholder="Tilboðsverð"
+                style={{ width: '100%', padding: '12px 44px 12px 14px', fontSize: '16px', border: '1px solid #e5e5e5', borderRadius: '8px', outline: 'none' }}
+              />
+              <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#999', fontSize: '14px' }}>kr.</span>
+            </div>
+            <button onClick={sendOffer} disabled={offerSending || !offerAmount}
+              style={{ width: '100%', background: offerAmount ? '#111' : '#e5e5e5', color: offerAmount ? '#fff' : '#999', padding: '13px', borderRadius: '8px', border: 'none', fontSize: '15px', fontWeight: '600', cursor: offerAmount ? 'pointer' : 'default' }}>
+              {offerSending ? 'Augnablik...' : 'Senda tilboð'}
+            </button>
+          </div>
+        </div>
+      )}
 
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 20px' }}>
         <div style={{ marginBottom: '16px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#111', padding: 0 }}>←</button>
         </div>
 
         <div className="listing-layout">
-
           {/* Images */}
           <div>
             <div style={{ display: 'flex', gap: '6px' }}>
-              <div
-                onClick={() => openLightbox(activeImg)}
-                className="main-img"
-                style={{ borderRadius: '10px', overflow: 'hidden', position: 'relative', cursor: 'zoom-in' }}
-              >
+              <div onClick={() => openLightbox(activeImg)} className="main-img" style={{ borderRadius: '10px', overflow: 'hidden', position: 'relative', cursor: 'zoom-in' }}>
                 {imgs[activeImg] ? (
                   <img src={imgs[activeImg]} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 ) : (
@@ -213,18 +255,13 @@ export default function ListingPage() {
                   </div>
                 )}
               </div>
-
               {imgs.length > 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '72px', flexShrink: 0 }}>
                   {imgs.slice(1, THUMB_COUNT + 1).map((url, i) => {
                     const realIndex = i + 1
                     const isLast = realIndex === THUMB_COUNT && imgs.length > THUMB_COUNT + 1
                     return (
-                      <div
-                        key={realIndex}
-                        onClick={() => openLightbox(realIndex)}
-                        style={{ aspectRatio: '3/4', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', position: 'relative', border: '2px solid transparent' }}
-                      >
+                      <div key={realIndex} onClick={() => openLightbox(realIndex)} style={{ aspectRatio: '3/4', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}>
                         <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.8 }} />
                         {isLast && (
                           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', fontWeight: '700' }}>
@@ -286,9 +323,14 @@ export default function ListingPage() {
                 <button onClick={handleBuy} style={{ width: '100%', background: '#111', color: '#fff', padding: '13px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                   Kaupa — {listing.price.toLocaleString('is-IS')} kr.
                 </button>
-                <button onClick={contactSeller} disabled={contacting} style={{ width: '100%', background: '#fff', color: '#111', padding: '13px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
-                  {contacting ? 'Augnablik...' : 'Hafa samband'}
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={contactSeller} disabled={contacting} style={{ flex: 1, background: '#fff', color: '#111', padding: '11px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
+                    {contacting ? 'Augnablik...' : 'Hafa samband'}
+                  </button>
+                  <button onClick={() => setOfferOpen(true)} style={{ flex: 1, background: '#fff', color: '#111', padding: '11px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
+                    Senda tilboð
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ background: '#f5f5f5', padding: '14px', borderRadius: '8px', fontSize: '14px', color: '#666', textAlign: 'center' }}>
@@ -297,10 +339,7 @@ export default function ListingPage() {
             )}
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
-              <button
-                onClick={toggleBookmark}
-                style={{ flex: 1, padding: '9px', background: bookmarked ? '#111' : '#fff', color: bookmarked ? '#fff' : '#111', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              >
+              <button onClick={toggleBookmark} style={{ flex: 1, padding: '9px', background: bookmarked ? '#111' : '#fff', color: bookmarked ? '#fff' : '#111', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill={bookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                 </svg>
@@ -336,37 +375,13 @@ export default function ListingPage() {
       </div>
 
       <style>{`
-        .listing-layout {
-          display: grid;
-          grid-template-columns: minmax(0, 500px) 320px;
-          gap: 24px;
-          align-items: start;
-          justify-content: center;
-        }
+        .listing-layout { display: grid; grid-template-columns: minmax(0, 500px) 320px; gap: 24px; align-items: start; justify-content: center; }
         .main-img { width: 380px; flex-shrink: 0; aspect-ratio: 3/4; max-height: 520px; }
         .listing-info { position: static; }
-        .mini-grid {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 8px;
-        }
+        .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
         .mini-card { background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e5e5; }
-        .mini-card-img {
-          width: 100%;
-          padding-bottom: 133.33%;
-          position: relative;
-          background: #f0f0f0;
-          overflow: hidden;
-          display: block;
-        }
-        .mini-card-img img {
-          position: absolute;
-          top: 0; left: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
+        .mini-card-img { width: 100%; padding-bottom: 133.33%; position: relative; background: #f0f0f0; overflow: hidden; display: block; }
+        .mini-card-img img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
         @media (max-width: 768px) {
           .listing-layout { grid-template-columns: 1fr; gap: 16px; justify-content: stretch; }
           .main-img { width: 100%; flex-shrink: 1; aspect-ratio: 3/4; max-height: none; }
@@ -383,10 +398,7 @@ function MiniCard({ listing }) {
     <Link href={'/listings/' + listing.id} style={{ textDecoration: 'none', color: 'inherit', display: 'block', alignSelf: 'start' }}>
       <div className="mini-card">
         <div className="mini-card-img">
-          {img
-            ? <img src={img} alt={listing.title} />
-            : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>📦</div>
-          }
+          {img ? <img src={img} alt={listing.title} /> : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>📦</div>}
         </div>
         <div style={{ padding: '8px' }}>
           <div style={{ fontSize: '12px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.title}</div>

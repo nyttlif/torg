@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '../../components/Navbar'
 import { supabase } from '@/lib/supabase'
+import { LOCATIONS } from '@/lib/categories'
 
 export default function EditProfile() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [name, setName] = useState('')
   const [bio, setBio] = useState('')
+  const [location, setLocation] = useState('')
   const [avatar, setAvatar] = useState(null)
   const [avatarUrl, setAvatarUrl] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -30,6 +32,7 @@ export default function EditProfile() {
     if (data) {
       setName(data.name || '')
       setBio(data.bio || '')
+      setLocation(data.location || '')
       setAvatarUrl(data.avatar_url || '')
     }
     setLoading(false)
@@ -55,6 +58,7 @@ export default function EditProfile() {
     const { error } = await supabase.from('profiles').update({
       name: name.trim(),
       bio: bio.trim(),
+      location,
       avatar_url: avatarUrl
     }).eq('id', user.id)
     if (error) { setError(error.message); setSaving(false); return }
@@ -91,14 +95,26 @@ export default function EditProfile() {
         {/* Name */}
         <div style={{ marginBottom: '20px' }}>
           <label style={labelStyle}>Nafn</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Jón Jónsson" maxLength={50} style={inputStyle} />
+          <input value={name} onChange={e => setName(e.target.value)} maxLength={50} style={inputStyle} />
         </div>
 
         {/* Bio */}
-        <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '20px' }}>
           <label style={labelStyle}>Um mig <span style={{ color: '#999', fontWeight: '400' }}>(valfrjálst)</span></label>
-          <textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Segðu okkur eitthvað um þig..." rows={4} maxLength={200} style={{ ...inputStyle, resize: 'vertical', lineHeight: '1.6' }} />
+          <textarea value={bio} onChange={e => setBio(e.target.value)} rows={4} maxLength={200} style={{ ...inputStyle, resize: 'vertical', lineHeight: '1.6' }} />
           <div style={{ fontSize: '11px', color: '#bbb', textAlign: 'right', marginTop: '3px' }}>{bio.length}/200</div>
+        </div>
+
+        {/* Location */}
+        <div style={{ marginBottom: '32px' }}>
+          <label style={labelStyle}>Staðsetning <span style={{ color: '#999', fontWeight: '400' }}>(notað til að reikna sendingargjald)</span></label>
+          <div style={{ position: 'relative' }}>
+            <select value={location} onChange={e => setLocation(e.target.value)} style={{ ...inputStyle, appearance: 'none', paddingRight: '32px' }}>
+              <option value="">Veldu staðsetningu</option>
+              {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+            <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#999', fontSize: '11px', pointerEvents: 'none' }}>▾</span>
+          </div>
         </div>
 
         {error && <div style={{ background: '#fef2f2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px', border: '1px solid #fecaca' }}>{error}</div>}

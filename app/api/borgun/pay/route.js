@@ -10,10 +10,10 @@ export async function POST(request) {
     const secretKey = process.env.BORGUN_SECRET_KEY
 
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://torget.is'
-    const returnUrlSuccess = `${baseUrl}/payment/success`
+    const returnUrlSuccess = `${baseUrl}/api/payment/success`
     const returnUrlSuccessServer = `${baseUrl}/api/borgun/confirm`
-    const returnUrlCancel = `${baseUrl}/payment/cancel`
-    const returnUrlError = `${baseUrl}/payment/error`
+    const returnUrlCancel = `${baseUrl}/api/payment/cancel`
+    const returnUrlError = `${baseUrl}/api/payment/error`
 
     // Borgun orderid max 12 alphanumeric chars
     const borgunOrderId = ('TRG' + orderId).slice(0, 12).replace(/[^a-zA-Z0-9]/g, '')

@@ -9,21 +9,22 @@ export async function POST(request) {
     const gatewayId = process.env.BORGUN_GATEWAY_ID
     const secretKey = process.env.BORGUN_SECRET_KEY
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://torget.is'
+    const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://torget.is').replace(/\/$/, '')
     const returnUrlSuccess = `${baseUrl}/api/payment/success`
     const returnUrlSuccessServer = `${baseUrl}/api/borgun/confirm`
     const returnUrlCancel = `${baseUrl}/api/payment/cancel`
     const returnUrlError = `${baseUrl}/api/payment/error`
 
-    // Borgun orderid max 12 alphanumeric chars
-    const borgunOrderId = ('TRG' + orderId).slice(0, 12).replace(/[^a-zA-Z0-9]/g, '')
+    // Borgun orderid: max 12 alphanumeric chars, no special chars
+    // Use a short prefix + padded id
+    const borgunOrderId = ('T' + String(orderId).padStart(11, '0')).slice(0, 12)
 
-    // Amount must be formatted as integer (ISK has no cents)
+    // Amount as integer string (ISK has no decimals)
     const amountStr = String(Math.round(amount))
 
     // CheckHash: MerchantId|ReturnUrlSuccess|ReturnUrlSuccessServer|OrderId|Amount|Currency
     const message = `${merchantId}|${returnUrlSuccess}|${returnUrlSuccessServer}|${borgunOrderId}|${amountStr}|ISK`
-    const checkhash = createHmac('sha256', secretKey).update(message).digest('hex')
+    const checkhash = createHmac('sha256', secretKey).update(message, 'utf8').digest('hex')
 
     return NextResponse.json({
       merchantid: merchantId,
@@ -40,7 +41,6 @@ export async function POST(request) {
       returnurlcancel: returnUrlCancel,
       returnurlerror: returnUrlError,
       skipreceiptpage: '1',
-      merchantlogo: `${baseUrl}/favicon.svg`,
     })
   } catch (err) {
     console.error('Borgun pay error:', err)

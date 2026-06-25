@@ -17,7 +17,7 @@ export async function POST(request) {
     const authorizationcode = formData.get('authorizationcode')
     const step = formData.get('step')
 
-    // Only process on Payment step (server-to-server notification)
+    // Only process on Payment step
     if (step !== 'Payment') {
       return new NextResponse('<PaymentNotification>Accepted</PaymentNotification>', {
         headers: { 'Content-Type': 'application/xml' }
@@ -33,18 +33,19 @@ export async function POST(request) {
     // Verify orderhash: HMAC_SHA256(OrderId|Amount|Currency, SecretKey)
     const secretKey = process.env.BORGUN_SECRET_KEY
     const expectedHash = createHmac('sha256', secretKey)
-      .update(`${orderId}|${amount}|ISK`)
+      .update(`${orderId}|${amount}|ISK`, 'utf8')
       .digest('hex')
 
     if (expectedHash.toLowerCase() !== orderhash?.toLowerCase()) {
-      console.error('Borgun orderhash mismatch')
+      console.error('Borgun orderhash mismatch', { expected: expectedHash, received: orderhash })
       return new NextResponse('<PaymentNotification>Accepted</PaymentNotification>', {
         headers: { 'Content-Type': 'application/xml' }
       })
     }
 
-    // Find order by borgun order id (TRG + our id)
-    const numericId = orderId.replace('TRG', '')
+    // Extract numeric id from borgun orderid (T + padded id)
+    const numericId = parseInt(orderId.slice(1))
+
     await supabase
       .from('orders')
       .update({
@@ -54,7 +55,7 @@ export async function POST(request) {
       })
       .eq('id', numericId)
 
-    // Now mark listing as sold
+    // Mark listing as sold
     const { data: orderData } = await supabase
       .from('orders')
       .select('listing_id')

@@ -174,7 +174,7 @@ export default function CheckoutPage() {
 
       {/* Hidden Borgun form — auto-submits when borgunFields is set */}
       {borgunFields && (
-        <form ref={formRef} method="post" action="https://test.borgun.is/SecurePay/default.aspx" style={{ display: 'none' }}>
+        <form ref={formRef} method="post" action="https://securepay.borgun.is/SecurePay/default.aspx" style={{ display: 'none' }}>
           {Object.entries(borgunFields).map(([key, value]) => (
             <input key={key} type="hidden" name={key} value={value} />
           ))}

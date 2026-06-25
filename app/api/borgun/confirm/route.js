@@ -54,6 +54,17 @@ export async function POST(request) {
       })
       .eq('id', numericId)
 
+    // Now mark listing as sold
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('listing_id')
+      .eq('id', numericId)
+      .single()
+
+    if (orderData?.listing_id) {
+      await supabase.from('listings').update({ status: 'sold' }).eq('id', orderData.listing_id)
+    }
+
     return new NextResponse('<PaymentNotification>Accepted</PaymentNotification>', {
       headers: { 'Content-Type': 'application/xml' }
     })

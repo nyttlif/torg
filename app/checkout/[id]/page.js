@@ -133,9 +133,6 @@ export default function CheckoutPage() {
 
     if (orderError) { setError(orderError.message); setPlacing(false); return }
 
-    // Mark listing as sold
-    await supabase.from('listings').update({ status: 'sold' }).eq('id', id)
-
     // Get Borgun payment fields
     const res = await fetch('/api/borgun/pay', {
       method: 'POST',

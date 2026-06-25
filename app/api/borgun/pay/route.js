@@ -26,6 +26,10 @@ export async function POST(request) {
     const message = `${merchantId}|${returnUrlSuccess}|${returnUrlSuccessServer}|${borgunOrderId}|${amountStr}|ISK`
     const checkhash = createHmac('sha256', secretKey).update(message, 'utf8').digest('hex')
 
+    console.log('BORGUN_MESSAGE:', message)
+    console.log('BORGUN_HASH:', checkhash)
+    console.log('BORGUN_MERCHANT_ID:', merchantId)
+
     return NextResponse.json({
       merchantid: merchantId,
       paymentgatewayid: gatewayId,

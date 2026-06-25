@@ -25,6 +25,11 @@ const toSRGB = (file) => new Promise(resolve => {
   img.src = URL.createObjectURL(file)
 })
 
+const WEIGHT_OPTIONS = [
+  { value: 'small', label: 'Lítið (0–10 kg)', desc: 'Fatnaður, skór, smávörur' },
+  { value: 'large', label: 'Stórt (10–30 kg)', desc: 'Húsgögn, tæki, stórar vörur' },
+]
+
 export default function EditListing() {
   const { id } = useParams()
   const router = useRouter()
@@ -37,6 +42,7 @@ export default function EditListing() {
   const [size, setSize] = useState('')
   const [condition, setCondition] = useState('')
   const [location, setLocation] = useState('')
+  const [weightClass, setWeightClass] = useState('small')
   const [mainCat, setMainCat] = useState('')
   const [subCat, setSubCat] = useState('')
   const [images, setImages] = useState([])
@@ -67,6 +73,7 @@ export default function EditListing() {
     setSize(data.size || '')
     setCondition(data.condition || '')
     setLocation(data.location || LOCATIONS[0])
+    setWeightClass(data.weight_class || 'small')
     setMainCat(data.category || '')
     setSubCat(data.subcategory || '')
     setImages(data.images ? data.images.split(',').filter(Boolean).map(url => ({ id: uniqueId(), url, preview: url, uploading: false })) : [])
@@ -126,6 +133,7 @@ export default function EditListing() {
       price: parseInt(price), category: mainCat, subcategory: subCat,
       category_path: getCategoryPath(mainCat, subCat, '', ''),
       condition, location, brand: brand.trim(), color, size,
+      weight_class: weightClass,
       images: images.map(i => i.url).join(',')
     }).eq('id', id)
     if (error) { setError(error.message); setSaving(false); return }
@@ -270,6 +278,20 @@ export default function EditListing() {
             </div>
           </div>
         )}
+
+        {/* Weight class */}
+        <div style={{ marginBottom: '24px' }}>
+          <label style={labelStyle}>Stærð pakka</label>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {WEIGHT_OPTIONS.map(opt => (
+              <button key={opt.value} onClick={() => setWeightClass(opt.value)}
+                style={{ flex: 1, padding: '12px 10px', borderRadius: '8px', border: '1px solid ' + (weightClass === opt.value ? '#111' : '#e5e5e5'), background: weightClass === opt.value ? '#111' : '#fff', color: weightClass === opt.value ? '#fff' : '#111', cursor: 'pointer', textAlign: 'left' }}>
+                <div style={{ fontSize: '13px', fontWeight: '500' }}>{opt.label}</div>
+                <div style={{ fontSize: '11px', opacity: 0.6, marginTop: '2px' }}>{opt.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
           <div>

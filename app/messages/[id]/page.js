@@ -152,14 +152,15 @@ function MessageThread() {
     if (!offerAmount || parseInt(offerAmount) <= 0) return
     setOfferSending(true)
     const cid = await ensureConv()
-    await supabase.from('offers').insert({
+    const { data: newOffer } = await supabase.from('offers').insert({
       conversation_id: parseInt(cid),
       listing_id: listing?.id || conv?.listings?.id,
       buyer_id: user.id,
       seller_id: conv?.seller_id || listing?.user_id,
       amount: parseInt(offerAmount),
       status: 'pending'
-    })
+    }).select().single()
+    if (newOffer) setOffers(prev => [...prev, newOffer])
     setOfferOpen(false)
     setOfferAmount('')
     setOfferSending(false)

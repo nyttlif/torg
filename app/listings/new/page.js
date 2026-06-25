@@ -25,6 +25,11 @@ const toSRGB = (file) => new Promise(resolve => {
   img.src = URL.createObjectURL(file)
 })
 
+const WEIGHT_OPTIONS = [
+  { value: 'small', label: 'Létt (0–10 kg)', desc: 'Fatnaður, skór, smávörur' },
+  { value: 'large', label: 'Þung (10–30 kg)', desc: 'Húsgögn, tæki, stórar vörur' },
+]
+
 export default function NewListing() {
   const [user, setUser] = useState(null)
   const [title, setTitle] = useState('')
@@ -35,6 +40,7 @@ export default function NewListing() {
   const [size, setSize] = useState('')
   const [condition, setCondition] = useState('')
   const [location, setLocation] = useState(LOCATIONS[0])
+  const [weightClass, setWeightClass] = useState('')
   const [mainCat, setMainCat] = useState('')
   const [subCat, setSubCat] = useState('')
   const [groupCat, setGroupCat] = useState('')
@@ -44,7 +50,6 @@ export default function NewListing() {
   const [error, setError] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const dragItem = useRef(null)
-  const dragTarget = useRef(null)
   const isDragging = useRef(false)
   const router = useRouter()
 
@@ -76,14 +81,9 @@ export default function NewListing() {
     }
   }
 
-  const onDrop = (e) => { e.preventDefault(); setDragOver(false); processFiles(e.dataTransfer.files) }
   const removeImage = (id) => setImages(prev => prev.filter(img => img.id !== id))
 
-  const onDragStartImg = (i) => {
-    dragItem.current = i
-    isDragging.current = true
-  }
-
+  const onDragStartImg = (i) => { dragItem.current = i; isDragging.current = true }
   const onDragEnterImg = (i) => {
     if (dragItem.current === null || dragItem.current === i) return
     setImages(prev => {
@@ -94,18 +94,13 @@ export default function NewListing() {
       return next
     })
   }
-
-  const onDragEndImg = () => {
-    dragItem.current = null
-    isDragging.current = false
-  }
+  const onDragEndImg = () => { dragItem.current = null; isDragging.current = false }
 
   const catData = mainCat ? CATEGORIES[mainCat] : null
   const subKeys = catData ? Object.keys(catData.subcategories) : []
   const subValue = (subCat && catData) ? catData.subcategories[subCat] : null
   const groupKeys = (subValue && !Array.isArray(subValue) && typeof subValue === 'object') ? Object.keys(subValue) : []
   const groupValue = (groupCat && subValue && !Array.isArray(subValue)) ? subValue[groupCat] : null
-  const leafKeys = Array.isArray(groupValue) ? groupValue : []
   const sizes = getSizes(mainCat, subCat, groupCat)
 
   const submit = async () => {
@@ -117,6 +112,7 @@ export default function NewListing() {
     if (!condition) { setError('Veldu ástand'); return }
     if (sizes && sizes.length > 0 && !size) { setError('Veldu stærð'); return }
     if (!color) { setError('Veldu lit'); return }
+    if (!weightClass) { setError('Veldu þyngdarflokk'); return }
     if (images.length === 0) { setError('Að minnsta kosti ein mynd þarf að fylgja'); return }
     if (images.some(i => i.uploading)) { setError('Bíddu eftir að myndir hlaðist upp'); return }
     setLoading(true)
@@ -131,6 +127,7 @@ export default function NewListing() {
       condition, location,
       brand: brand.trim(),
       color, size,
+      weight_class: weightClass,
       images: images.map(i => i.url).join(','),
       status: 'active'
     }).select().single()
@@ -152,16 +149,14 @@ export default function NewListing() {
           <div
             onDragOver={e => { e.preventDefault(); if (!isDragging.current) setDragOver(true) }}
             onDragEnter={e => { e.preventDefault(); if (!isDragging.current) setDragOver(true) }}
-            onDragLeave={e => { if (!isDragging.current) setDragOver(false) }}
+            onDragLeave={() => { if (!isDragging.current) setDragOver(false) }}
             onDrop={e => { e.preventDefault(); if (!isDragging.current) { setDragOver(false); processFiles(e.dataTransfer.files) } }}
             style={{ border: '2px dashed ' + (dragOver ? '#111' : '#e0e0e0'), borderRadius: '12px', padding: '20px', background: dragOver ? '#f5f5f5' : '#fafafa', minHeight: '80px' }}
           >
             {images.length > 0 && (
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
                 {images.map((img, i) => (
-                  <div
-                    key={img.id}
-                    draggable
+                  <div key={img.id} draggable
                     onDragStart={(e) => { e.stopPropagation(); onDragStartImg(i) }}
                     onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); onDragEnterImg(i) }}
                     onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
@@ -265,7 +260,7 @@ export default function NewListing() {
           <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="t.d. Nike, Apple, IKEA..." style={input} />
         </div>
 
-        {/* Size — required when available */}
+        {/* Size */}
         {sizes && sizes.length > 0 && (
           <div style={{ marginBottom: '16px' }}>
             <label style={label}>Stærð</label>
@@ -280,7 +275,7 @@ export default function NewListing() {
           </div>
         )}
 
-        {/* Color — always required */}
+        {/* Color */}
         <div style={{ marginBottom: '16px' }}>
           <label style={label}>Litur</label>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -288,6 +283,20 @@ export default function NewListing() {
               <button key={c} onClick={() => setColor(color === c ? '' : c)}
                 style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid ' + (color === c ? '#111' : '#e5e5e5'), background: color === c ? '#111' : '#fff', color: color === c ? '#fff' : '#111', fontSize: '13px', cursor: 'pointer' }}>
                 {c}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Weight class */}
+        <div style={{ marginBottom: '24px' }}>
+          <label style={label}>Þyngd</label>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {WEIGHT_OPTIONS.map(opt => (
+              <button key={opt.value} onClick={() => setWeightClass(opt.value)}
+                style={{ flex: 1, padding: '12px 10px', borderRadius: '8px', border: '1px solid ' + (weightClass === opt.value ? '#111' : '#e5e5e5'), background: weightClass === opt.value ? '#111' : '#fff', color: weightClass === opt.value ? '#fff' : '#111', cursor: 'pointer', textAlign: 'left' }}>
+                <div style={{ fontSize: '13px', fontWeight: '500' }}>{opt.label}</div>
+                <div style={{ fontSize: '11px', opacity: 0.6, marginTop: '2px' }}>{opt.desc}</div>
               </button>
             ))}
           </div>

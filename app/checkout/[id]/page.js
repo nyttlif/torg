@@ -6,6 +6,12 @@ import Script from 'next/script'
 import Navbar from '../../components/Navbar'
 import { supabase } from '@/lib/supabase'
 
+// Dropp pricing (incl. VAT) based on weight class and delivery type
+const SHIPPING_PRICES = {
+  dropp: { small: 870, large: 1820 },
+  shipping: { small: 1410, large: 2370 },
+}
+
 export default function CheckoutPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -22,7 +28,6 @@ export default function CheckoutPage() {
   const [city, setCity] = useState('')
   const [delivery, setDelivery] = useState('dropp')
   const [droppLocation, setDroppLocation] = useState(null)
-  const [droppScriptReady, setDroppScriptReady] = useState(false)
   const [error, setError] = useState('')
 
   const storeId = process.env.NEXT_PUBLIC_DROPP_STORE_ID
@@ -31,7 +36,6 @@ export default function CheckoutPage() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push('/auth'); return }
       setUser(session.user)
-      // Pre-fill email from auth
       if (session.user.email) setEmail(session.user.email)
     })
     fetchListing()
@@ -47,8 +51,10 @@ export default function CheckoutPage() {
     setLoading(false)
   }
 
+  const weightClass = listing?.weight_class || 'small'
+  const shippingFee = SHIPPING_PRICES[delivery]?.[weightClass] ?? SHIPPING_PRICES[delivery].small
   const platformFee = listing ? Math.round(listing.price * 0.08) : 0
-  const total = listing ? listing.price + platformFee : 0
+  const total = listing ? listing.price + platformFee + shippingFee : 0
 
   const openDroppMap = () => {
     if (typeof window === 'undefined' || !window.chooseDroppLocation) {
@@ -56,9 +62,7 @@ export default function CheckoutPage() {
       return
     }
     window.chooseDroppLocation()
-      .then(location => {
-        if (location) setDroppLocation(location)
-      })
+      .then(location => { if (location) setDroppLocation(location) })
       .catch(() => setError('Ekki tókst að opna Dropp kort'))
   }
 
@@ -83,6 +87,7 @@ export default function CheckoutPage() {
       seller_id: listing.user_id,
       amount: listing.price,
       platform_fee: platformFee,
+      shipping_fee: shippingFee,
       seller_payout: listing.price - platformFee,
       status: 'pending_payment',
       shipping_address: shippingData,
@@ -121,13 +126,11 @@ export default function CheckoutPage() {
 
   return (
     <div>
-      {/* Load Dropp map widget */}
       <Script
-        src={`//app.dropp.is/dropp-locations.min.js`}
+        src="//app.dropp.is/dropp-locations.min.js"
         data-store-id={storeId}
         data-env="production"
         strategy="afterInteractive"
-        onReady={() => setDroppScriptReady(true)}
       />
 
       <Navbar />
@@ -188,12 +191,10 @@ export default function CheckoutPage() {
           <label style={labelStyle}>Nafn</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Jón Jónsson" style={inputStyle} />
         </div>
-
         <div style={{ marginBottom: '16px' }}>
           <label style={labelStyle}>Símanúmer</label>
           <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="777 7777" style={inputStyle} />
         </div>
-
         <div style={{ marginBottom: delivery === 'shipping' ? '16px' : '24px' }}>
           <label style={labelStyle}>Netfang <span style={{ color: '#999', fontWeight: '400' }}>(valfrjálst)</span></label>
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="jon@example.is" style={inputStyle} />
@@ -228,6 +229,10 @@ export default function CheckoutPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: '#888' }}>
             <span>Þjónustugjald (8%)</span>
             <span>{platformFee.toLocaleString('is-IS')} kr.</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: '#888' }}>
+            <span>Sending {weightClass === 'large' ? '(10–30 kg)' : '(0–10 kg)'}</span>
+            <span>{shippingFee.toLocaleString('is-IS')} kr.</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '700', borderTop: '1px solid #e5e5e5', paddingTop: '10px', marginTop: '4px' }}>
             <span>Samtals</span>

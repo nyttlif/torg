@@ -155,6 +155,11 @@ export default function ListingPage() {
     router.push('/messages/' + convId)
   }
 
+  const handleBuy = () => {
+    if (!user) { router.push('/auth'); return }
+    router.push('/checkout/' + id)
+  }
+
   const markStatus = async (status) => {
     await supabase.from('listings').update({ status }).eq('id', id)
     fetchListing()
@@ -174,10 +179,6 @@ export default function ListingPage() {
     listing.location && { label: 'Staðsetning', value: listing.location },
   ].filter(Boolean)
 
-  // Thumbnails fill the same height as main image (3:4 ratio)
-  // Main image width = 340px, so height = 340 * 4/3 = ~453px
-  // 4 thumbs with 3 gaps of 6px: thumb height = (453 - 18) / 4 = ~108.75px
-  // Thumb width at 3:4 = 108.75 * 3/4 = ~81px
   const THUMB_COUNT = 4
 
   return (
@@ -196,7 +197,6 @@ export default function ListingPage() {
           {/* Images */}
           <div>
             <div style={{ display: 'flex', gap: '6px' }}>
-              {/* Main image */}
               <div
                 onClick={() => openLightbox(activeImg)}
                 className="main-img"
@@ -214,7 +214,6 @@ export default function ListingPage() {
                 )}
               </div>
 
-              {/* Thumbnails */}
               {imgs.length > 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '72px', flexShrink: 0 }}>
                   {imgs.slice(1, THUMB_COUNT + 1).map((url, i) => {
@@ -249,7 +248,7 @@ export default function ListingPage() {
 
             {specs.length > 0 && (
               <div style={{ border: '1px solid #e5e5e5', borderRadius: '10px', padding: '4px 16px', marginBottom: '14px' }}>
-                {specs.map(({ label, value }, i) => (
+                {specs.map(({ label, value }) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid #f5f5f5' }}>
                     <span style={{ fontSize: '13px', color: '#888' }}>{label}</span>
                     <span style={{ fontSize: '13px', fontWeight: '500' }}>{value}</span>
@@ -283,16 +282,20 @@ export default function ListingPage() {
                 {listing.status === 'reserved' && <button onClick={() => markStatus('active')} style={{ padding: '9px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', color: '#666', cursor: 'pointer' }}>Taka af frátekingu</button>}
               </div>
             ) : listing.status === 'active' ? (
-              <button onClick={contactSeller} disabled={contacting} style={{ width: '100%', background: '#111', color: '#fff', padding: '13px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
-                {contacting ? 'Augnablik...' : 'Hafa samband'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button onClick={handleBuy} style={{ width: '100%', background: '#111', color: '#fff', padding: '13px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                  Kaupa — {listing.price.toLocaleString('is-IS')} kr.
+                </button>
+                <button onClick={contactSeller} disabled={contacting} style={{ width: '100%', background: '#fff', color: '#111', padding: '13px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
+                  {contacting ? 'Augnablik...' : 'Hafa samband'}
+                </button>
+              </div>
             ) : (
               <div style={{ background: '#f5f5f5', padding: '14px', borderRadius: '8px', fontSize: '14px', color: '#666', textAlign: 'center' }}>
                 {listing.status === 'reserved' ? 'Þessi vara er frátekið' : 'Þessi vara hefur verið seld'}
               </div>
             )}
 
-            {/* Bottom actions */}
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
               <button
                 onClick={toggleBookmark}
@@ -315,7 +318,6 @@ export default function ListingPage() {
           </div>
         </div>
 
-        {/* Related listings — full width below both columns */}
         {sellerListings.length > 0 && (
           <div style={{ marginTop: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
@@ -343,7 +345,6 @@ export default function ListingPage() {
         }
         .main-img { width: 380px; flex-shrink: 0; aspect-ratio: 3/4; max-height: 520px; }
         .listing-info { position: static; }
-        .related-desktop { }
         .mini-grid {
           display: grid;
           grid-template-columns: repeat(5, 1fr);
@@ -366,13 +367,10 @@ export default function ListingPage() {
           object-fit: cover;
           display: block;
         }
-        .related-mobile { display: none; }
         @media (max-width: 768px) {
           .listing-layout { grid-template-columns: 1fr; gap: 16px; justify-content: stretch; }
           .main-img { width: 100%; flex-shrink: 1; aspect-ratio: 3/4; max-height: none; }
           .mini-grid { grid-template-columns: repeat(3, 1fr); }
-          .related-desktop { display: none !important; }
-          .related-mobile { display: block; }
         }
       `}</style>
     </div>

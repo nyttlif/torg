@@ -20,7 +20,7 @@ export async function POST(request) {
     const borgunOrderId = ('T' + String(orderId).padStart(11, '0')).slice(0, 12)
 
     // Amount as integer string (ISK has no decimals)
-    const amountStr = Math.round(amount).toFixed(2).replace('.', ',')
+    const amountStr = String(Math.round(amount))
 
     // CheckHash: MerchantId|ReturnUrlSuccess|ReturnUrlSuccessServer|OrderId|Amount|Currency
     const message = `${merchantId}|${returnUrlSuccess}|${returnUrlSuccessServer}|${borgunOrderId}|${amountStr}|ISK`

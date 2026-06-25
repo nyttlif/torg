@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Script from 'next/script'
 import Navbar from '../../components/Navbar'
@@ -26,13 +26,12 @@ function getShippingFee(deliveryType, weightClass, sellerLocation) {
 export default function CheckoutPage() {
   const { id } = useParams()
   const router = useRouter()
+  const formRef = useRef(null)
   const [user, setUser] = useState(null)
   const [listing, setListing] = useState(null)
   const [sellerLocation, setSellerLocation] = useState('')
   const [loading, setLoading] = useState(true)
   const [placing, setPlacing] = useState(false)
-  const [done, setDone] = useState(false)
-  const [convId, setConvId] = useState(null)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -42,6 +41,7 @@ export default function CheckoutPage() {
   const [delivery, setDelivery] = useState('dropp')
   const [droppLocation, setDroppLocation] = useState(null)
   const [error, setError] = useState('')
+  const [borgunFields, setBorgunFields] = useState(null)
 
   const storeId = process.env.NEXT_PUBLIC_DROPP_STORE_ID
 
@@ -53,6 +53,13 @@ export default function CheckoutPage() {
     })
     fetchListing()
   }, [id])
+
+  // Auto-submit Borgun form when fields are ready
+  useEffect(() => {
+    if (borgunFields && formRef.current) {
+      formRef.current.submit()
+    }
+  }, [borgunFields])
 
   const fetchListing = async () => {
     const { data } = await supabase
@@ -109,7 +116,8 @@ export default function CheckoutPage() {
       ? { type: 'dropp', locationId: droppLocation.id, locationName: droppLocation.name, name, phone, email }
       : { type: 'shipping', name, phone, email, address, zipcode, city }
 
-    const { error: orderError } = await supabase.from('orders').insert({
+    // Save order to Supabase
+    const { data: order, error: orderError } = await supabase.from('orders').insert({
       listing_id: listing.id,
       buyer_id: user.id,
       seller_id: listing.user_id,
@@ -121,38 +129,38 @@ export default function CheckoutPage() {
       status: 'pending_payment',
       shipping_address: shippingData,
       dropp_location_id: delivery === 'dropp' ? droppLocation.id : null,
-    })
+    }).select().single()
 
     if (orderError) { setError(orderError.message); setPlacing(false); return }
 
+    // Mark listing as sold
     await supabase.from('listings').update({ status: 'sold' }).eq('id', id)
-    setConvId(conversationId)
-    setDone(true)
-    setPlacing(false)
+
+    // Get Borgun payment fields
+    const res = await fetch('/api/borgun/pay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: order.id,
+        amount: total,
+        buyerName: name,
+        buyerEmail: email
+      })
+    })
+
+    const fields = await res.json()
+    if (fields.error) { setError('Villa við greiðslu: ' + fields.error); setPlacing(false); return }
+
+    // Add item lines
+    fields.itemdescription_0 = listing.title.slice(0, 80)
+    fields.itemcount_0 = '1'
+    fields.itemunitamount_0 = String(listing.price)
+    fields.itemamount_0 = String(listing.price)
+
+    setBorgunFields(fields)
   }
 
   if (loading) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Hleður...</div></>
-
-  if (done) return (
-    <div>
-      <Navbar />
-      <div style={{ maxWidth: '500px', margin: '80px auto', padding: '0 20px', textAlign: 'center' }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-        <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '8px' }}>Pöntun móttekin!</h1>
-        <p style={{ color: '#666', marginBottom: '24px' }}>Seljandi hefur fengið tilkynningu og mun sjá um sendinguna fljótlega.</p>
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-          {convId && (
-            <button onClick={() => router.push('/messages/' + convId)} style={{ background: '#111', color: '#fff', padding: '12px 24px', borderRadius: '8px', border: 'none', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
-              Opna samtal
-            </button>
-          )}
-          <button onClick={() => router.push('/')} style={{ background: '#fff', color: '#111', padding: '12px 24px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
-            Til baka á forsíðu
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 
   if (!listing || listing.status !== 'active') return (
     <div>
@@ -165,6 +173,16 @@ export default function CheckoutPage() {
     <div>
       <Script src="//app.dropp.is/dropp-locations.min.js" data-store-id={storeId} data-env="production" strategy="afterInteractive" />
       <Navbar />
+
+      {/* Hidden Borgun form — auto-submits when borgunFields is set */}
+      {borgunFields && (
+        <form ref={formRef} method="post" action="https://test.borgun.is/SecurePay/default.aspx" style={{ display: 'none' }}>
+          {Object.entries(borgunFields).map(([key, value]) => (
+            <input key={key} type="hidden" name={key} value={value} />
+          ))}
+        </form>
+      )}
+
       <div style={{ maxWidth: '560px', margin: '0 auto', padding: '40px 20px 80px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '32px' }}>Kaupa vöru</h1>
 
@@ -267,20 +285,14 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Payment placeholder */}
-        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '16px', marginBottom: '24px' }}>
-          <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '4px', color: '#92400e' }}>💳 Greiðsla</div>
-          <div style={{ fontSize: '13px', color: '#92400e' }}>Greiðslulausn er í vinnslu. Þú munt fá leiðbeiningar um greiðslu eftir pöntun.</div>
-        </div>
-
         {error && <div style={{ background: '#fef2f2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px', border: '1px solid #fecaca' }}>{error}</div>}
 
         <button onClick={placeOrder} disabled={placing}
           style={{ width: '100%', background: placing ? '#999' : '#111', color: '#fff', padding: '15px', borderRadius: '10px', border: 'none', fontSize: '16px', fontWeight: '600', cursor: placing ? 'not-allowed' : 'pointer' }}>
-          {placing ? 'Augnablik...' : 'Staðfesta pöntun — ' + total.toLocaleString('is-IS') + ' kr.'}
+          {placing ? 'Augnablik...' : 'Greiða — ' + total.toLocaleString('is-IS') + ' kr.'}
         </button>
         <p style={{ fontSize: '12px', color: '#aaa', textAlign: 'center', marginTop: '12px' }}>
-          Með því að panta samþykkir þú skilmála Torgs
+          Með því að greiða samþykkir þú skilmála Torgs
         </p>
       </div>
     </div>

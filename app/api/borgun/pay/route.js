@@ -23,7 +23,7 @@ export async function POST(request) {
     const amountStr = String(Math.round(amount))
 
     // CheckHash: MerchantId|ReturnUrlSuccess|ReturnUrlSuccessServer|OrderId|Amount|Currency
-    const message = `${merchantId}|${returnUrlSuccess}|${returnUrlSuccessServer}|${borgunOrderId}|${amountStr}|ISK`
+    const message = `${merchantId}|${returnUrlSuccess}|${returnUrlSuccess}|${borgunOrderId}|${amountStr}|ISK`
     const checkhash = createHmac('sha256', secretKey).update(message, 'utf8').digest('hex')
 
     console.log('BORGUN_MESSAGE:', message)
@@ -41,7 +41,6 @@ export async function POST(request) {
       buyername: buyerName || '',
       buyeremail: buyerEmail || '',
       returnurlsuccess: returnUrlSuccess,
-      returnurlsuccessserver: returnUrlSuccessServer,
       returnurlcancel: returnUrlCancel,
       returnurlerror: returnUrlError,
       skipreceiptpage: '1',

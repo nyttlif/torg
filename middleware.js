@@ -8,6 +8,7 @@ export function middleware(request) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/favicon') ||
+    pathname.startsWith('/payment') ||
     pathname.includes('.')
   ) {
     return NextResponse.next()

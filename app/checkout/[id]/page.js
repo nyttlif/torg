@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Script from 'next/script'
 import Navbar from '../../components/Navbar'
 import { supabase } from '@/lib/supabase'
 
@@ -14,15 +15,24 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false)
   const [done, setDone] = useState(false)
   const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [address, setAddress] = useState('')
+  const [zipcode, setZipcode] = useState('')
   const [city, setCity] = useState('')
   const [delivery, setDelivery] = useState('dropp')
+  const [droppLocation, setDroppLocation] = useState(null)
+  const [droppScriptReady, setDroppScriptReady] = useState(false)
   const [error, setError] = useState('')
+
+  const storeId = process.env.NEXT_PUBLIC_DROPP_STORE_ID
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push('/auth'); return }
       setUser(session.user)
+      // Pre-fill email from auth
+      if (session.user.email) setEmail(session.user.email)
     })
     fetchListing()
   }, [id])
@@ -40,24 +50,46 @@ export default function CheckoutPage() {
   const platformFee = listing ? Math.round(listing.price * 0.08) : 0
   const total = listing ? listing.price + platformFee : 0
 
+  const openDroppMap = () => {
+    if (typeof window === 'undefined' || !window.chooseDroppLocation) {
+      setError('Dropp kort er ekki tilbúið, reyndu aftur')
+      return
+    }
+    window.chooseDroppLocation()
+      .then(location => {
+        if (location) setDroppLocation(location)
+      })
+      .catch(() => setError('Ekki tókst að opna Dropp kort'))
+  }
+
   const placeOrder = async () => {
     setError('')
     if (!name.trim()) { setError('Nafn vantar'); return }
+    if (!phone.trim()) { setError('Símanúmer vantar'); return }
+    if (delivery === 'dropp' && !droppLocation) { setError('Veldu Dropp afhendingarstað'); return }
     if (delivery === 'shipping' && !address.trim()) { setError('Heimilisfang vantar'); return }
+    if (delivery === 'shipping' && !zipcode.trim()) { setError('Póstnúmer vantar'); return }
+    if (delivery === 'shipping' && !city.trim()) { setError('Borg vantar'); return }
+
     setPlacing(true)
 
-    const { error } = await supabase.from('orders').insert({
+    const shippingData = delivery === 'dropp'
+      ? { type: 'dropp', locationId: droppLocation.id, locationName: droppLocation.name, name, phone, email }
+      : { type: 'shipping', name, phone, email, address, zipcode, city }
+
+    const { error: orderError } = await supabase.from('orders').insert({
       listing_id: listing.id,
       buyer_id: user.id,
       seller_id: listing.user_id,
       amount: listing.price,
       platform_fee: platformFee,
       seller_payout: listing.price - platformFee,
-      status: 'paid',
-      shipping_address: { name, address, city, delivery }
+      status: 'pending_payment',
+      shipping_address: shippingData,
+      dropp_location_id: delivery === 'dropp' ? droppLocation.id : null,
     })
 
-    if (error) { setError(error.message); setPlacing(false); return }
+    if (orderError) { setError(orderError.message); setPlacing(false); return }
 
     await supabase.from('listings').update({ status: 'sold' }).eq('id', id)
     setDone(true)
@@ -72,7 +104,7 @@ export default function CheckoutPage() {
       <div style={{ maxWidth: '500px', margin: '80px auto', padding: '0 20px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
         <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '8px' }}>Pöntun móttekin!</h1>
-        <p style={{ color: '#666', marginBottom: '24px' }}>Seljandi hefur fengið tilkynningu og mun hafa samband vegna afhendingar.</p>
+        <p style={{ color: '#666', marginBottom: '24px' }}>Seljandi hefur fengið tilkynningu og mun hafa samband vegna greiðslu og afhendingar.</p>
         <button onClick={() => router.push('/')} style={{ background: '#111', color: '#fff', padding: '12px 24px', borderRadius: '8px', border: 'none', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
           Til baka á forsíðu
         </button>
@@ -89,6 +121,15 @@ export default function CheckoutPage() {
 
   return (
     <div>
+      {/* Load Dropp map widget */}
+      <Script
+        src={`//app.dropp.is/dropp-locations.min.js`}
+        data-store-id={storeId}
+        data-env="production"
+        strategy="afterInteractive"
+        onReady={() => setDroppScriptReady(true)}
+      />
+
       <Navbar />
       <div style={{ maxWidth: '560px', margin: '0 auto', padding: '40px 20px 80px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '32px' }}>Kaupa vöru</h1>
@@ -109,8 +150,8 @@ export default function CheckoutPage() {
           <label style={labelStyle}>Afhendingarmáti</label>
           <div style={{ display: 'flex', gap: '10px' }}>
             {[
-              { value: 'dropp', label: 'Dropp lykill', desc: 'Sótt í næsta Dropp hirðilás' },
-              { value: 'shipping', label: 'Póstur', desc: 'Sent heim til þín' },
+              { value: 'dropp', label: '📦 Dropp', desc: 'Sótt í næsta Dropp hirðilás' },
+              { value: 'shipping', label: '🚚 Póstur', desc: 'Sent heim til þín' },
             ].map(opt => (
               <button key={opt.value} onClick={() => setDelivery(opt.value)}
                 style={{ flex: 1, padding: '12px 8px', borderRadius: '8px', border: '1px solid ' + (delivery === opt.value ? '#111' : '#e5e5e5'), background: delivery === opt.value ? '#111' : '#fff', color: delivery === opt.value ? '#fff' : '#111', cursor: 'pointer', textAlign: 'center' }}>
@@ -121,22 +162,59 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Name */}
+        {/* Dropp location picker */}
+        {delivery === 'dropp' && (
+          <div style={{ marginBottom: '24px' }}>
+            <label style={labelStyle}>Dropp afhendingarstaður</label>
+            {droppLocation ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: '500', color: '#111' }}>{droppLocation.name || 'Staður valinn'}</div>
+                  <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{droppLocation.address || ''}</div>
+                </div>
+                <button onClick={openDroppMap} style={{ fontSize: '12px', color: '#666', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Breyta</button>
+              </div>
+            ) : (
+              <button onClick={openDroppMap}
+                style={{ width: '100%', padding: '14px', border: '2px dashed #e5e5e5', borderRadius: '8px', background: '#fafafa', cursor: 'pointer', fontSize: '14px', color: '#555', fontWeight: '500' }}>
+                🗺 Velja Dropp afhendingarstað
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Customer info */}
         <div style={{ marginBottom: '16px' }}>
           <label style={labelStyle}>Nafn</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Jón Jónsson" style={inputStyle} />
         </div>
 
-        {/* Address (only for shipping) */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={labelStyle}>Símanúmer</label>
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="777 7777" style={inputStyle} />
+        </div>
+
+        <div style={{ marginBottom: delivery === 'shipping' ? '16px' : '24px' }}>
+          <label style={labelStyle}>Netfang <span style={{ color: '#999', fontWeight: '400' }}>(valfrjálst)</span></label>
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="jon@example.is" style={inputStyle} />
+        </div>
+
+        {/* Shipping address */}
         {delivery === 'shipping' && (
           <>
             <div style={{ marginBottom: '16px' }}>
               <label style={labelStyle}>Heimilisfang</label>
               <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Laugavegur 1" style={inputStyle} />
             </div>
-            <div style={{ marginBottom: '24px' }}>
-              <label style={labelStyle}>Borg / Póstnúmer</label>
-              <input value={city} onChange={e => setCity(e.target.value)} placeholder="101 Reykjavík" style={inputStyle} />
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '12px', marginBottom: '24px' }}>
+              <div>
+                <label style={labelStyle}>Póstnúmer</label>
+                <input value={zipcode} onChange={e => setZipcode(e.target.value)} placeholder="101" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Borg</label>
+                <input value={city} onChange={e => setCity(e.target.value)} placeholder="Reykjavík" style={inputStyle} />
+              </div>
             </div>
           </>
         )}
@@ -157,14 +235,20 @@ export default function CheckoutPage() {
           </div>
         </div>
 
+        {/* Payment placeholder */}
+        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '16px', marginBottom: '24px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '4px', color: '#92400e' }}>💳 Greiðsla</div>
+          <div style={{ fontSize: '13px', color: '#92400e' }}>Greiðslulausn er í vinnslu. Þú munt fá leiðbeiningar um greiðslu eftir pöntun.</div>
+        </div>
+
         {error && <div style={{ background: '#fef2f2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px', border: '1px solid #fecaca' }}>{error}</div>}
 
         <button onClick={placeOrder} disabled={placing}
-          style={{ width: '100%', background: placing ? '#999' : '#2563eb', color: '#fff', padding: '15px', borderRadius: '10px', border: 'none', fontSize: '16px', fontWeight: '600', cursor: placing ? 'not-allowed' : 'pointer' }}>
-          {placing ? 'Augnablik...' : 'Staðfesta kaup — ' + total.toLocaleString('is-IS') + ' kr.'}
+          style={{ width: '100%', background: placing ? '#999' : '#111', color: '#fff', padding: '15px', borderRadius: '10px', border: 'none', fontSize: '16px', fontWeight: '600', cursor: placing ? 'not-allowed' : 'pointer' }}>
+          {placing ? 'Augnablik...' : 'Staðfesta pöntun — ' + total.toLocaleString('is-IS') + ' kr.'}
         </button>
         <p style={{ fontSize: '12px', color: '#aaa', textAlign: 'center', marginTop: '12px' }}>
-          Með því að kaupa samþykkir þú skilmála Torgs
+          Með því að panta samþykkir þú skilmála Torgs
         </p>
       </div>
     </div>

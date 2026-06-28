@@ -51,15 +51,11 @@ export function middleware(request) {
     }
     .container { text-align: center; padding: 40px 20px; }
     .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 24px; }
-    h1 { font-size: 18px; font-weight: 500; color: #444; margin-bottom: 8px; }
-    p { font-size: 14px; color: #999; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="logo">Torget</div>
-    <h1>Torget er í uppfærslu</h1>
-    <p>Komdu aftur fljótlega</p>
   </div>
 </body>
 </html>`,

@@ -48,8 +48,9 @@ export default function ProfilePage() {
 
   const isOwn = user?.id === id
   const activeListings = listings.filter(l => l.status === 'active')
+  const reservedListings = listings.filter(l => l.status === 'reserved')
   const soldListings = listings.filter(l => l.status === 'sold')
-  const shown = tab === 'active' ? activeListings : soldListings
+  const shown = tab === 'active' ? activeListings : tab === 'reserved' ? reservedListings : soldListings
 
   if (loading) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Hleður...</div></>
   if (!profile) return <><Navbar /><div style={{ textAlign: 'center', padding: '80px', color: '#999' }}>Notandi fannst ekki</div></>
@@ -102,6 +103,7 @@ export default function ProfilePage() {
         <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', borderBottom: '1px solid #e5e5e5' }}>
           {[
             { key: 'active', label: 'Til sölu', count: activeListings.length },
+            ...(isOwn && reservedListings.length > 0 ? [{ key: 'reserved', label: 'Frátekið', count: reservedListings.length }] : []),
             { key: 'sold', label: 'Selt', count: soldListings.length },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}

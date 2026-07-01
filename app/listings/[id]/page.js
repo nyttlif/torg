@@ -312,7 +312,7 @@ export default function ListingPage() {
                   {listing.status === 'active' && <button onClick={() => markStatus('reserved')} style={{ flex: 1, padding: '11px', background: '#fff', color: '#111', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>Frátekið</button>}
                   {(listing.status === 'active' || listing.status === 'reserved') && <button onClick={() => markStatus('sold')} style={{ flex: 1, padding: '11px', background: '#111', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>Selt</button>}
                 </div>
-                {listing.status === 'reserved' && <button onClick={() => markStatus('active')} style={{ padding: '9px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', color: '#666', cursor: 'pointer' }}>Taka af frátekingu</button>}
+                {listing.status === 'reserved' && <button onClick={() => markStatus('active')} style={{ padding: '9px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', color: '#666', cursor: 'pointer' }}>Ekki frátekið</button>}
               </div>
             ) : listing.status === 'active' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

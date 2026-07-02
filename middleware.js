@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server'
 
+// Site is public — flip to true to bring back the maintenance/preview gate
+const MAINTENANCE_MODE = false
+
 export function middleware(request) {
+  if (!MAINTENANCE_MODE) {
+    return NextResponse.next()
+  }
+
   const { pathname, searchParams } = request.nextUrl
 
   // Allow API routes, static files, and Next.js internals always

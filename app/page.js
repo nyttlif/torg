@@ -5,10 +5,11 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from './components/Navbar'
 import { supabase } from '@/lib/supabase'
-import { CATEGORIES, LOCATIONS, getSizes } from '@/lib/categories'
+import { CATEGORIES, getSizes } from '@/lib/categories'
 
 const SORT_OPTIONS = ['Nýjast', 'Lægsta verð', 'Hæsta verð']
 const SORT_MAP = { 'Nýjast': 'newest', 'Lægsta verð': 'price_asc', 'Hæsta verð': 'price_desc' }
+const HIDDEN_HOME_CATEGORIES = ['bíla', 'gælud'] // hides "Bílar og farartæki" and "Gæludýr" style entries from homepage pills
 
 function Pill({ active, onClick, children }) {
   return (
@@ -25,17 +26,14 @@ function HomeContent() {
   const [subCat, setSubCat] = useState('')
   const [groupCat, setGroupCat] = useState('')
   const [size, setSize] = useState('')
-  const [location, setLocation] = useState('')
   const [sort, setSort] = useState('Nýjast')
   const [sortOpen, setSortOpen] = useState(false)
-  const [locationOpen, setLocationOpen] = useState(false)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const sortRef = useRef(null)
-  const locationRef = useRef(null)
   const search = searchParams.get('search') || ''
 
   useEffect(() => {
@@ -45,7 +43,6 @@ function HomeContent() {
   useEffect(() => {
     const handler = (e) => {
       if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false)
-      if (locationRef.current && !locationRef.current.contains(e.target)) setLocationOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -57,7 +54,6 @@ function HomeContent() {
     if (mainCat) query = query.eq('category', mainCat)
     if (subCat) query = query.eq('subcategory', subCat)
     if (size) query = query.eq('size', size)
-    if (location) query = query.eq('location', location)
     if (minPrice) query = query.gte('price', parseInt(minPrice))
     if (maxPrice) query = query.lte('price', parseInt(maxPrice))
     if (search) query = query.ilike('title', '%' + search + '%')
@@ -68,12 +64,16 @@ function HomeContent() {
     const { data } = await query.limit(80)
     setListings(data || [])
     setLoading(false)
-  }, [mainCat, subCat, size, location, sort, minPrice, maxPrice, search])
+  }, [mainCat, subCat, size, sort, minPrice, maxPrice, search])
 
   useEffect(() => { fetchListings() }, [fetchListings])
 
-  const clearAll = () => { setMainCat(''); setSubCat(''); setGroupCat(''); setSize(''); setLocation(''); setMinPrice(''); setMaxPrice('') }
-  const hasFilters = mainCat || subCat || size || location || minPrice || maxPrice
+  const clearAll = () => { setMainCat(''); setSubCat(''); setGroupCat(''); setSize(''); setMinPrice(''); setMaxPrice('') }
+  const hasFilters = mainCat || subCat || size || minPrice || maxPrice
+
+  const visibleCategories = Object.entries(CATEGORIES).filter(
+    ([name]) => !HIDDEN_HOME_CATEGORIES.some(term => name.toLowerCase().includes(term))
+  )
 
   const catData = mainCat ? CATEGORIES[mainCat] : null
   const subKeys = catData ? Object.keys(catData.subcategories) : []
@@ -82,18 +82,18 @@ function HomeContent() {
   const sizes = getSizes(mainCat, subCat, groupCat)
   const isFirstVisit = !loading && listings.length === 0 && !hasFilters && !search
 
-  const filterCount = [mainCat, subCat, size, location, minPrice, maxPrice].filter(Boolean).length
+  const filterCount = [mainCat, subCat, size, minPrice, maxPrice].filter(Boolean).length
 
   return (
     <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '20px 20px 80px' }}>
 
       {/* Desktop filter bar */}
       <div className="desktop-filters" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-        {/* Row 1: first half of categories + sort + location */}
+        {/* Row 1: first half of categories + sort */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'nowrap', overflow: 'hidden' }}>
             <Pill active={!mainCat} onClick={() => { setMainCat(''); setSubCat(''); setGroupCat(''); setSize('') }}>Allt</Pill>
-            {Object.entries(CATEGORIES).slice(0, 7).map(([name, data]) => (
+            {visibleCategories.slice(0, 7).map(([name, data]) => (
               <Pill key={name} active={mainCat === name} onClick={() => { setMainCat(mainCat === name ? '' : name); setSubCat(''); setGroupCat(''); setSize('') }}>
                 {data.icon} {name}
               </Pill>
@@ -101,7 +101,7 @@ function HomeContent() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '12px' }}>
             <div ref={sortRef} style={{ position: 'relative' }}>
-              <button onClick={() => { setSortOpen(o => !o); setLocationOpen(false) }}
+              <button onClick={() => setSortOpen(o => !o)}
                 style={{ padding: '6px 12px', fontSize: '13px', border: '1px solid #e5e5e5', borderRadius: '8px', background: sort !== 'Nýjast' ? '#111' : '#fff', color: sort !== 'Nýjast' ? '#fff' : '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                 {sort} <span style={{ opacity: 0.5, fontSize: '11px' }}>↕</span>
               </button>
@@ -111,25 +111,13 @@ function HomeContent() {
                 </div>
               )}
             </div>
-            <div ref={locationRef} style={{ position: 'relative' }}>
-              <button onClick={() => { setLocationOpen(o => !o); setSortOpen(false) }}
-                style={{ padding: '6px 12px', fontSize: '13px', border: '1px solid #e5e5e5', borderRadius: '8px', background: location ? '#111' : '#fff', color: location ? '#fff' : '#555', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                📍 {location || 'Staðsetning'}
-              </button>
-              {locationOpen && (
-                <div style={{ position: 'absolute', top: '36px', right: 0, background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', zIndex: 50, overflow: 'hidden', minWidth: '160px' }}>
-                  <button onClick={() => { setLocation(''); setLocationOpen(false) }} style={{ display: 'block', width: '100%', padding: '10px 16px', background: !location ? '#f5f5f5' : '#fff', border: 'none', textAlign: 'left', fontSize: '13px', cursor: 'pointer' }}>Allar staðsetningar</button>
-                  {LOCATIONS.map(l => <button key={l} onClick={() => { setLocation(l); setLocationOpen(false) }} style={{ display: 'block', width: '100%', padding: '10px 16px', background: location === l ? '#f5f5f5' : '#fff', border: 'none', textAlign: 'left', fontSize: '13px', cursor: 'pointer', fontWeight: location === l ? '600' : '400' }}>{l}</button>)}
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
         {/* Row 2: remaining categories + price inputs */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'nowrap' }}>
-            {Object.entries(CATEGORIES).slice(7).map(([name, data]) => (
+            {visibleCategories.slice(7).map(([name, data]) => (
               <Pill key={name} active={mainCat === name} onClick={() => { setMainCat(mainCat === name ? '' : name); setSubCat(''); setGroupCat(''); setSize('') }}>
                 {data.icon} {name}
               </Pill>
@@ -193,7 +181,7 @@ function HomeContent() {
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Flokkur</div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <Pill active={!mainCat} onClick={() => { setMainCat(''); setSubCat(''); setGroupCat(''); setSize('') }}>Allt</Pill>
-                {Object.entries(CATEGORIES).map(([name, data]) => (
+                {visibleCategories.map(([name, data]) => (
                   <Pill key={name} active={mainCat === name} onClick={() => { setMainCat(mainCat === name ? '' : name); setSubCat(''); setGroupCat(''); setSize('') }}>
                     {data.icon} {name}
                   </Pill>
@@ -224,13 +212,6 @@ function HomeContent() {
                 </div>
               </div>
             )}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Staðsetning</div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <Pill active={!location} onClick={() => setLocation('')}>Allar</Pill>
-                {LOCATIONS.map(l => <Pill key={l} active={location === l} onClick={() => setLocation(l)}>{l}</Pill>)}
-              </div>
-            </div>
             <div style={{ marginBottom: '28px' }}>
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#888', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verð</div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -241,7 +222,7 @@ function HomeContent() {
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               {hasFilters && (
-                <button onClick={() => { clearAll(); }} style={{ flex: 1, padding: '13px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', fontSize: '15px', cursor: 'pointer', color: '#666' }}>Hreinsa síu</button>
+                <button onClick={clearAll} style={{ flex: 1, padding: '13px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '10px', fontSize: '15px', cursor: 'pointer', color: '#666' }}>Hreinsa síu</button>
               )}
               <button onClick={() => setFilterDrawerOpen(false)} style={{ flex: 2, padding: '13px', background: '#111', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>
                 Sýna niðurstöður {listings.length > 0 && '(' + listings.length + ')'}
